@@ -1,0 +1,27 @@
+name: Import original Looply history (safe snapshot)
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  mirror-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone original public repository with full history
+        run: |
+          git clone --no-single-branch https://github.com/soumoiss/Looply.git original
+          cd original
+          git fetch origin main
+          test "$(git rev-parse origin/main)" = "d96527dd71a28aa3efb535615fe827dfaacba5d9"
+      - name: Create isolated source snapshot branch (never overwrite)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd original
+          git remote add destination "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          if git ls-remote --exit-code destination refs/heads/source-snapshot-20261025; then
+            echo "Snapshot branch already exists; refusing overwrite"
+            exit 1
+          fi
+          git push destination refs/remotes/origin/main:refs/heads/source-snapshot-20261025
+          echo "Source history snapshot created without modifying main or migration branch"
