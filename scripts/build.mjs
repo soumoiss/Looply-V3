@@ -15,7 +15,7 @@ await mkdir(outputDirectory, { recursive: true });
 // GitHub Pages serves project sites under /owner-repo/; disable Jekyll rewriting.
 await writeFile(path.join(outputDirectory, ".nojekyll"), "");
 
-for (const file of ["index.html", "login.html", "home.html", "musicas.html", "chat.html", "conversa.html", "cartas.html", "notificacoes.html", "usuarios.html", "configuracoes.html", "perfil.html", "admin.html", "galeria.html", "styles.css"]) {
+for (const file of ["index.html", "login.html", "recuperar.html", "home.html", "musicas.html", "chat.html", "conversa.html", "cartas.html", "notificacoes.html", "usuarios.html", "configuracoes.html", "perfil.html", "admin.html", "galeria.html", "styles.css"]) {
   await cp(path.join(projectRoot, file), path.join(outputDirectory, file));
 }
 
