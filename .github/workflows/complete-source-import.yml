@@ -1,0 +1,56 @@
+name: Complete source SQL import (isolated branch)
+on:
+  push:
+    branches:
+      - migration/import-source-20261025
+    paths:
+      - .github/workflows/complete-source-import.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  import-sql:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout private V3 migration branch
+        uses: actions/checkout@v4
+        with:
+          ref: migration/import-source-20261025
+          persist-credentials: true
+      - name: Fetch pinned public source
+        run: |
+          git clone --filter=blob:none https://github.com/soumoiss/Looply.git /tmp/looply-source
+          git -C /tmp/looply-source checkout --detach d96527dd71a28aa3efb535615fe827dfaacba5d9
+      - name: Copy SQL files only; preserve V3 documents and code
+        run: |
+          mkdir -p supabase/migrations supabase/manual
+          cp -a /tmp/looply-source/supabase/migrations/. supabase/migrations/
+          cp -a /tmp/looply-source/supabase/manual/. supabase/manual/
+          git add supabase/migrations supabase/manual
+          if git diff --cached --quiet; then
+            echo "No new SQL files to import"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore(import): preserve remaining original SQL migrations"
+          git push origin HEAD:migration/import-source-20261025
+      - name: Verify original tracked files
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+          source=Path('/tmp/looply-source')
+          paths=subprocess.check_output(['git','-C',str(source),'ls-files'],text=True).splitlines()
+          differences=[]
+          for name in paths:
+              if name=='README.md':
+                  continue
+              target=Path(name)
+              if not target.is_file() or target.read_bytes()!=(source/name).read_bytes():
+                  differences.append(name)
+          print(f'Original tracked files checked: {len(paths)}; differences excluding V3 README: {len(differences)}')
+          if differences:
+              print('\n'.join(differences[:30]))
+              raise SystemExit(1)
+          PY
