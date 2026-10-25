@@ -116,3 +116,40 @@ No schema privado `looply_candidate` foram reproduzidos, com consultas apenas de
 - validação pós-DDL através de função interna `looply_migration.verify_candidate_snapshot()`: **56/56 tabelas idênticas ao snapshot de origem por contagem e digest**.
 
 Importante: funções SQL, triggers, views, RLS policies da aplicação, `SECURITY DEFINER`, esquemas operacionais `auth/storage`, autenticação real, bytes de mídia e tempo real **não foram portados**. As tabelas candidatas seguem inacessíveis pela Data API. A função de validação é `SECURITY INVOKER` e o schema privado não tem GRANT público.
+
+## Atualização operacional — Neon Functions, snapshot e plano de transferência (2026-10-25)
+
+### Infraestrutura Free confirmada
+
+- Organização `org-royal-shape-81986230` no plano Free.
+- PostgreSQL atual da homologação: cerca de **14.172.160 bytes**; a API do projeto ainda indica teto **512 MiB**, embora o site oficial informe **1 GB/projeto** desde outubro de 2026. Adotar **512 MiB** como limite operacional até a API confirmar outro valor.
+- Neon Object Storage ativo com sete buckets privados: **5 GB/projeto** anunciados para plano Free. Os 277 objetos originais (369.296.700 bytes de metadados) cabem em volume nominal, sem garantia de velocidade, largura de banda ilimitada ou operação futura sem limites.
+- Neon Functions no Free: até **1 milhão de invocações/mês**, 10 active/400 waiting Capacity-Hours. Função `staginghealth` implantada na branch isolada, **deployment ID 2, status completed**, Node.js 24, sem acesso a tabelas ou dados privados. Endpoint `https://br-round-fog-b7pseu7j-staginghealth.compute.c-13.us-east-1.aws.neon.tech/health`; validação HTTP externa ainda sem comprovação. Código `backend/neon/functions/staginghealth/index.mjs`, testes locais/CI propostos em `tests/neon-staging-health.test.mjs`.
+- Cloudflare R2 permanece indisponível: `403/10042 NotEntitled`, exigindo habilitação de R2 na conta. **Não** foi ativada assinatura nem faturamento. Escolha de infraestrutura: Neon Storage, enquanto as cotas gratuitas forem suficientes.
+- Não foi feito upgrade ou assinatura de plano pago.
+
+### Snapshot Neon protegido
+
+- Backup interno manual criado com ID **`snap-curly-shape-b7es25v7`**, nome `looply-v3-staging-pre-auth-20261025` da branch `br-round-fog-b7pseu7j`; listado e confirmado pelo Neon. Plano Free inclui **um** snapshot manual.
+- **Não** é backup offsite e **não** contém bytes de imagens, vídeos ou áudios não migrados. Antes do corte ainda será obrigatório backup externo seguro e teste de restauração.
+
+### Verificador executável e transferência de mídia em preparação
+
+- `backend/neon/sql/staging-readiness.sql` executado no Neon: 56/56 tabelas com RLS, hashes iguais, zero grants públicos, 867 linhas, **6 contas legadas vs. 0 no Neon Auth, 277 objetos catalogados vs. 0 efetivamente verificados, cutover_approved=false**.
+- `backend/neon/scripts/media-transfer.mjs`: execução explicitamente bloqueada por padrão; exige manifesto privado com URLs assinadas de download, upload e verificação; compara tamanho e SHA-256 pós-transferência e não registra tokens em logs. `tests/neon-media-transfer.test.mjs` cobre entradas inválidas, conteúdo divergente e transferência simulada. Nenhuma transferência real executada e nenhuma credencial armazenada no repositório.
+- Workflow `.github/workflows/staging-smoke.yml` criado para `npm test` e consulta HTTP real; **nenhum resultado de run confirmado pelo conector no momento deste registro**, logo testes não devem ser chamados de aprovados.
+
+### Inventário adicional de lógica faltante (consulta somente leitura à produção)
+
+- Funções SQL no schema `public`: **44**; triggers não internos: **36**.
+- Políticas RLS `public`: **157**; policies `storage`: **33**.
+- Publicações Realtime `public`: **30** tabelas.
+- Na homologação privada, **zero** dessas funções/triggers/policies foram portadas. RLS ON com políticas de negação, sem exposição por Data API. Essas lógicas são pré-requisitos de segurança antes de abrir a API de dados da aplicação.
+- A documentação atual de migração Supabase→Neon declara que hashes de senha legados **não migram diretamente** para Managed Better Auth e que `auth.updateUser({password})` não é suportado. Preparar fluxo novo de ativação/redefinição com provas de posse, mantendo os UUIDs legados vinculados de forma segura sem criar perfis duplicados. Não criar contas reais silenciosamente nem enviar convites nesta etapa.
+
+### Referências oficiais
+
+- https://neon.com/docs/introduction/plans
+- https://neon.com/docs/auth/migrate/from-supabase
+- https://developers.cloudflare.com/r2/pricing/
+- https://developers.cloudflare.com/r2/api/error-codes/
