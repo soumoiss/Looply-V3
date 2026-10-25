@@ -17,7 +17,7 @@ function isAllowedProjectUrl(value) {
 }
 
 export const isSupabaseConfigured =
-  config.backendProvider === "neon" && isAllowedProjectUrl(authUrl) && isAllowedProjectUrl(dataApiUrl);
+  (config.backendProvider === "neon" && isAllowedProjectUrl(authUrl) && isAllowedProjectUrl(dataApiUrl)) || config.temporaryLegacyAuthentication === true;
 
 export const supabase = isSupabaseConfigured
   ? createClient({
