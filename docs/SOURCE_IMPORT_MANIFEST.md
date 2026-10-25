@@ -28,3 +28,10 @@ Destino: `soumoiss/Looply-V3`, branch `migration/import-source-20261025`.
 - Confirmar o SHA/blob ou conteúdo de cada arquivo.
 - Não inserir segredos ou dados pessoais no repositório.
 - Para preservação integral do histórico, realizar espelhamento Git por um ambiente com acesso de clone/push e credenciais autorizadas, depois reconciliar esta ramificação.
+
+## Atualização verificada — 2026-10-25
+- 58 arquivos de código original transferidos (61 blobs no branch, incluindo README e 2 documentos próprios).
+- Tree Git do destino consultada: 68 entradas, 61 blobs; importação ainda incompleta frente aos 338 blobs da origem.
+- Commits adicionais: b6a196b, 4c7746d, 882bb52, f1c92a1, 3d398b9, fe673df.
+- Inventário Supabase de leitura: projeto Looply V2 tem 6 usuários Auth e 277 objetos Storage (~369,3 MB declarados); ainda sem backup ou cópia de dados.
+- Nenhum teste de build, integração ou E2E executado.
