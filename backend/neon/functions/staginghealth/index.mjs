@@ -1,6 +1,6 @@
 // Looply V3 isolated staging probe. Public response contains no user or database data.
 // This is NOT an application API, session provider, or production readiness check.
-const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff","access-control-allow-origin":"null"}});
+const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"}});
 export default {
   async fetch(request) {
     const url = new URL(request.url);
