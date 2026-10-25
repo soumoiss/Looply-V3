@@ -61,3 +61,11 @@ Até confirmação de equivalência funcional e integridade de dados, manter os 
 - Criado workflow de acionamento **manual** `.github/workflows/import-original-history.yml` na main, commit `1d4c4da43bce357d24c0d102523e39cb5fb7c9d5`. Se executado, faz clone completo da origem, valida SHA de main e cria branch isolada `source-snapshot-20261025` com histórico original. Nunca altera a main do V3 nem a branch incremental. Não executado nem testado ainda.
 - Atenção: a cópia integral do histórico também pode conter credenciais históricas. Antes de tornar público ou implantar, realizar auditoria de segredos e rotação de credenciais afetadas.
 - Build, testes funcionais, exportação e restauração de dados ainda não realizados.
+
+## Continuação verificada — 2026-10-25
+- Branch `migration/import-source-20261025`: 210/338 arquivos originais presentes, conferidos por caminhos e hashes Git. README.md é a única diferença de hash entre os caminhos presentes e deve ser reconciliado sem sobrescrever a documentação V3.
+- Os 128 arquivos faltantes pertencem todos a `supabase/` (migrações SQL e SQL manual).
+- Aplicação Android completa (36 arquivos) e documentação complementar (11 arquivos) transferidas, commit `2695858e347850c62469d2777db21accf75a9aaa`.
+- Funções Edge legadas (6) e configurações copiadas, commit `3e71026e874d804ca8196032eab8bf56ec0efd83`.
+- O código transferido **ainda depende do Supabase**. Não publicar nem anunciar como backend migrado.
+- O workflow de espelhamento do histórico permanece manual, não executado. Não foi comprovada a viabilidade do backend Oracle/R2, nem backup ou restauração.
