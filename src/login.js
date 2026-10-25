@@ -105,6 +105,12 @@ if (!isSupabaseConfigured || !supabase) {
         return;
       }
 
+      // The previous username gateway belongs to Supabase; Neon Auth accepts email.
+      if (!isEmailLogin && window.LOOPLY_CONFIG?.backendProvider === "neon") {
+        status(message, "O login pelo nome de usuário ainda não foi migrado para o V3. Entre com o e-mail e a senha de uma conta já ativada no Neon. Senhas antigas ainda não foram transferidas.");
+        return;
+      }
+
       submit.disabled = true;
       submit.textContent = "Entrando…";
       try {
