@@ -10,12 +10,18 @@ import { profileAreaMarkup } from "../src/profiles.js";
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path) => readFile(resolve(projectRoot, path), "utf8");
 
-test("the browser client uses an exact Supabase JS version and a publishable key", async () => {
-  const [client, config] = await Promise.all([read("src/supabase.js"), read("config.js")]);
-  assert.match(client, /@supabase\/supabase-js@2\.117\.3/);
-  assert.match(client, /sb_publishable_/);
+test("the browser client uses pinned Neon Auth and Data API without legacy Supabase credentials", async () => {
+  const [client, config, vendorEntry, packageJson] = await Promise.all([
+    read("src/supabase.js"), read("config.js"), read("src/neon-vendor-entry.js"), read("package.json")
+  ]);
+  assert.match(client, /\/assets\/vendor\/neon-js\.js/);
+  assert.match(vendorEntry, /@neondatabase\/neon-js/);
+  assert.equal(JSON.parse(packageJson).dependencies["@neondatabase/neon-js"], "0.9.0-beta");
+  assert.match(client, /SupabaseAuthAdapter\(\)/);
+  assert.match(config, /backendProvider:\s*["']neon["']/);
+  assert.match(config, /\.neon\.tech\/neondb/);
+  assert.doesNotMatch(client + config, /\.supabase\.co|sb_publishable_/i);
   assert.doesNotMatch(client + config, /service_role|sb_secret_/i);
-  assert.match(client, /persistSession:\s*true/);
 });
 
 test("transient Auth verification failures do not sign the user out or force a login redirect", async () => {
@@ -136,8 +142,9 @@ test("account playlists play tracks in an in-app dialog and never link out to Yo
   assert.match(playlists, /youtube-playlist-timeout/);
   assert.match(playlists, /playlistCachePrefix/);
   assert.match(playlists, /authorization: "Bearer " \+ accessToken/);
-  assert.match(playlists, /LOOPLY_CONFIG\?\.supabaseUrl/);
-  assert.match(playlists, /functions\/v1\/looply-youtube-playlist/);
+  assert.match(playlists, /LOOPLY_CONFIG\?\.apiBaseUrl/);
+  assert.match(playlists, /\/api\/youtube-playlist/);
+  assert.doesNotMatch(playlists, /\.supabase\.co|sb_publishable_|publishableKey/);
   assert.match(musicPage, /assets\/js\/music\.js/);
   assert.doesNotMatch(playlists, /AIza[\w-]{20,}/);
 });
@@ -224,11 +231,11 @@ test("YouTube playlist loading paginates, ignores unavailable videos, and explai
     return { ok: true, status: 200, json: async () => pagesFromApi[requests.length - 1] };
   });
   assert.equal(requests.length, 2);
-  assert.equal(requests[0].url.pathname, "/functions/v1/looply-youtube-playlist");
+  assert.equal(requests[0].url.pathname, "/api/youtube-playlist");
   assert.equal(requests[0].url.searchParams.get("playlistId"), "PLD5PXwJcU-Sg");
   assert.equal(requests[0].url.searchParams.has("key"), false);
   assert.equal(requests[0].options.headers.authorization, "Bearer unit-test-token");
-  assert.equal(typeof requests[0].options.headers.apikey, "string");
+  assert.equal("apikey" in requests[0].options.headers, false);
   assert.equal(requests[1].url.searchParams.get("pageToken"), "page-2");
   assert.deepEqual(tracks.map((track) => track.title), ["Faixa 1", "Faixa 2"]);
   assert.match(youtubeApiErrorMessage(502, { error: "youtube_quota_exceeded", reason: "quotaExceeded" }), /cota diária/i);
@@ -576,12 +583,16 @@ test("an archive upload conflict is recoverable only when Storage confirms the e
   assert.equal(canReuseArchiveObjectAfterUploadFailure(null, { exists: true, byteSize: 4096 }, 4096), false);
 });
 
-test("all resumable uploads include the publishable key and archive retries use the server-side Storage check", async () => {
+test("all resumable uploads use the authenticated V3 gateway and archive retries retain verification", async () => {
   const [archive, social, chat, admin] = await Promise.all([
     read("src/archive-import.js"), read("src/social.js"), read("src/chat.js"),
     read("supabase/functions/looply-admin/index.ts")
   ]);
-  for (const source of [archive, social, chat]) assert.match(source, /apikey: publishableKey/);
+  for (const source of [archive, social, chat]) {
+    assert.match(source, /\/api\/uploads\/resumable/);
+    assert.match(source, /authorization: `Bearer \$\{/);
+    assert.doesNotMatch(source, /apikey:|publishableKey|\.supabase\.co/);
+  }
   assert.match(archive, /client\.functions\.invoke\("looply-admin", \{[\s\S]*?verify_archive_media_upload/);
   assert.match(admin, /payload\.action === "verify_archive_media_upload"/);
   assert.match(admin, /service\.storage\.from\("looply-media"\)\.list\(folder/);

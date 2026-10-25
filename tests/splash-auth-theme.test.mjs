@@ -27,12 +27,15 @@ test("the initial route is a seven-second themed splash with an accessible anima
   assert.match(css, /prefers-reduced-motion/);
 });
 
-test("Supabase Auth explicitly persists the session in browser storage and refreshes tokens", async () => {
-  const source = await read("src/supabase.js");
-  assert.match(source, /autoRefreshToken:\s*true/);
-  assert.match(source, /persistSession:\s*true/);
-  assert.match(source, /storage:\s*window\.localStorage/);
-  assert.match(source, /storageKey:\s*["']looply-auth["']/);
+test("Neon Managed Auth owns persisted sessions without browser credential storage", async () => {
+  const [source, vendorEntry, packageJson] = await Promise.all([
+    read("src/supabase.js"), read("src/neon-vendor-entry.js"), read("package.json")
+  ]);
+  assert.match(source, /\/assets\/vendor\/neon-js\.js/);
+  assert.match(vendorEntry, /@neondatabase\/neon-js/);
+  assert.equal(JSON.parse(packageJson).dependencies["@neondatabase/neon-js"], "0.9.0-beta");
+  assert.match(source, /SupabaseAuthAdapter\(\)/);
+  assert.doesNotMatch(source, /window\.localStorage|storageKey|persistSession/);
   assert.doesNotMatch(source, /signOut\(\)/);
 });
 

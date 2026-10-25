@@ -12,8 +12,9 @@ test("playlist remains sourced from the YouTube Data API with complete paginatio
   assert.match(playlist, /Tentar novamente/);
   assert.match(playlist, /youtube-nocookie\.com\/embed/);
   assert.match(api, /LOOPLY_YOUTUBE_API_KEY/);
-  assert.match(playlist, /functions\/v1\/looply-youtube-playlist/);
-  assert.match(playlist, /apikey: String\(globalThis\.window\?\.LOOPLY_CONFIG\?\.publishableKey/);
+  assert.match(playlist, /apiBaseUrl/);
+  assert.match(playlist, /\/api\/youtube-playlist/);
+  assert.doesNotMatch(playlist, /publishableKey|headers\.apikey/);
   assert.match(proxy, /upstreamEndpoint = "https:\/\/looply-mu\.vercel\.app\/api\/youtube-playlist"/);
   assert.match(proxy, /headers: \{ accept: "application\/json", authorization \}/);
   assert.match(proxy, /access-control-allow-origin/);

@@ -169,21 +169,15 @@ async function uploadResumable(client, path, file, contentType, onProgress) {
   const { data, error } = await client.auth.getSession();
   const token = data?.session?.access_token;
   if (error || !token) throw new Error("A sessão administrativa expirou.");
-  const configuredUrl = window.LOOPLY_CONFIG?.supabaseUrl;
-  if (!configuredUrl) throw new Error("A configuração do Supabase não foi encontrada.");
-  const publishableKey = window.LOOPLY_CONFIG?.publishableKey;
-  if (!publishableKey) throw new Error("A chave pública do Supabase não está configurada.");
-  const projectUrl = new URL(configuredUrl);
-  const endpoint = projectUrl.hostname.endsWith(".supabase.co")
-    ? `${projectUrl.protocol}//${projectUrl.hostname.replace(/\.supabase\.co$/, ".storage.supabase.co")}/storage/v1/upload/resumable`
-    : new URL("/storage/v1/upload/resumable", projectUrl).toString();
+  const apiBaseUrl = String(window.LOOPLY_CONFIG?.apiBaseUrl || window.location.origin);
+  const endpoint = new URL("/api/uploads/resumable", apiBaseUrl).toString();
   const tus = await import("https://esm.sh/tus-js-client@4.3.1");
   const uploadFile = file.type === contentType ? file : new File([file], file.name, { type: contentType });
   await new Promise((resolve, reject) => {
     const upload = new tus.Upload(uploadFile, {
       endpoint,
       retryDelays: [0, 3000, 5000, 10000, 20000],
-      headers: { authorization: `Bearer ${token}`, apikey: publishableKey },
+      headers: { authorization: `Bearer ${token}` },
       uploadDataDuringCreation: true,
       removeFingerprintOnSuccess: true,
       chunkSize: 6 * 1024 * 1024,

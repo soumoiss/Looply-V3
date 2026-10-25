@@ -95,10 +95,12 @@ if (!isSupabaseConfigured || !supabase) {
     form?.addEventListener("submit", async (event) => {
       event.preventDefault();
       const formData = new FormData(form);
-      const username = String(formData.get("username") || "").trim().toLowerCase();
+      const identity = String(formData.get("username") || "").trim().toLowerCase();
       const secret = String(formData.get("password") || "");
+      const isEmailLogin = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identity);
+      const username = isEmailLogin ? "" : identity;
       message.classList.remove("show");
-      if (!/^[a-z0-9_]{3,30}$/.test(username) || !secret || secret.length > 256) {
+      if ((!isEmailLogin && !/^[a-z0-9_]{3,30}$/.test(username)) || !secret || secret.length > 256) {
         status(message, "Usuário ou senha incorretos.");
         return;
       }
@@ -106,6 +108,19 @@ if (!isSupabaseConfigured || !supabase) {
       submit.disabled = true;
       submit.textContent = "Entrando…";
       try {
+        if (isEmailLogin) {
+          const { data: emailAuthData, error: emailAuthError } = await supabase.auth.signInWithPassword({
+            email: identity,
+            password: secret
+          });
+          if (emailAuthError) throw emailAuthError;
+          if (!emailAuthData?.session?.access_token || !emailAuthData.session.refresh_token) {
+            throw new Error("session_not_created");
+          }
+          window.location.replace(nextPage);
+          return;
+        }
+        if (!supabase.functions?.invoke) throw Object.assign(new Error("username_gateway_unavailable"), { name: "FunctionsFetchError" });
         const { data, error } = await supabase.functions.invoke("looply-login", {
           body: { username, password: secret }
         });
