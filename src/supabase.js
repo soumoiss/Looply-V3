@@ -1,4 +1,4 @@
-import { createClient, SupabaseAuthAdapter } from "/assets/vendor/neon-js.js";
+import { createClient, SupabaseAuthAdapter } from "../assets/vendor/neon-js.js";
 
 const config = window.LOOPLY_CONFIG || {};
 const authUrl = String(config.neonAuthUrl || "").trim();
