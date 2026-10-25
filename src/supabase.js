@@ -1,5 +1,4 @@
 import { createClient, SupabaseAuthAdapter } from "../assets/vendor/neon-js.js";
-import { legacySupabase } from "./legacy-supabase-client.js";
 
 const config = window.LOOPLY_CONFIG || {};
 const authUrl = String(config.neonAuthUrl || "").trim();
@@ -17,7 +16,7 @@ function isAllowedProjectUrl(value) {
 }
 
 export const isSupabaseConfigured =
-  (config.backendProvider === "neon" && isAllowedProjectUrl(authUrl) && isAllowedProjectUrl(dataApiUrl)) || config.temporaryLegacyAuthentication === true;
+  config.backendProvider === "neon" && isAllowedProjectUrl(authUrl) && isAllowedProjectUrl(dataApiUrl);
 
 export const supabase = isSupabaseConfigured
   ? createClient({
