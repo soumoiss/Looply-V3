@@ -69,3 +69,9 @@ Até confirmação de equivalência funcional e integridade de dados, manter os 
 - Funções Edge legadas (6) e configurações copiadas, commit `3e71026e874d804ca8196032eab8bf56ec0efd83`.
 - O código transferido **ainda depende do Supabase**. Não publicar nem anunciar como backend migrado.
 - O workflow de espelhamento do histórico permanece manual, não executado. Não foi comprovada a viabilidade do backend Oracle/R2, nem backup ou restauração.
+
+## Atualização incremental — SQL
+- Branch `migration/import-source-20261025`: 235/338 arquivos da origem presentes; 103 SQL migrations ainda ausentes. Verificação por hash Git mostra diferença apenas no README.md.
+- Migrações iniciais de perfis, posts, conversas, arquivo histórico, mídias e notificações preservadas em commits `1feae9e9c9c089efdc4ad166eaf55b8c5e091c77` e `04ea788d457a94df107db55ff854a0a6436c2a8e`.
+- Corrigido workflow manual de histórico para usar o commit auditado exato, commit `87239f86974cf3f45e3827a54e91dcd26034678a`.
+- Sem implantação, testes E2E ou migração de dados nesta etapa.
