@@ -7,6 +7,7 @@ test("staging health is explicit and contains no production readiness claim", as
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type"), /application\/json/);
   assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(response.headers.get("access-control-allow-origin"), null);
   assert.equal(response.headers.get("x-content-type-options"), "nosniff");
   const payload = await response.json();
   assert.deepEqual(payload, {
