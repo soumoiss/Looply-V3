@@ -62,3 +62,64 @@ test("upstream failures return no internal details",async()=>{
   assert.equal((await r.text()).includes("private backend error"),false);
  }finally{globalThis.fetch=original;}
 });
+
+test("feed rejects requests without JWT before any data API call",async()=>{
+ const orig=globalThis.fetch;
+ let calls=0;
+ globalThis.fetch=async()=>{calls++;throw Error("network should not run")};
+ try{
+  const r=await worker.fetch(new Request(BASE+"/api/feed"));
+  assert.equal(r.status,401);
+  assert.equal(calls,0);
+ }finally{globalThis.fetch=orig}
+});
+
+test("feed request pins read-only Neon query and sanitizes response fields",async()=>{
+ const orig=globalThis.fetch;
+ let endpoint,method,authorization;
+ globalThis.fetch=async (url,opts)=>{
+  endpoint=String(url);method=opts.method;authorization=opts.headers.authorization;
+  return new Response(JSON.stringify([{id:"post-1",author_id:"user-1",body:"Hello",visibility:"public",created_at:"2026-10-25T00:00:00Z",updated_at:null,external_url:null,secret:"must-not-leak"}]),{status:200});
+ };
+ try{
+  const r=await worker.fetch(new Request(BASE+"/api/feed?select=*&limit=9999",{headers:{authorization:"Bearer test.jwt.signature"}}));
+  assert.equal(r.status,200);
+  const body=await r.json();
+  assert.equal(body.posts.length,1);
+  assert.equal(body.posts[0].secret,undefined);
+  assert.ok(endpoint.includes("/v3_feed_posts?select=id,author_id") && endpoint.includes("limit=25"));
+  assert.equal(endpoint.includes("9999"),false);
+  assert.equal(method,"GET");
+  assert.equal(authorization,"Bearer test.jwt.signature");
+ }finally{globalThis.fetch=orig}
+});
+
+test("claim endpoint requires same origin and explicit bearer JWT",async()=>{
+ const orig=globalThis.fetch;
+ let calls=0;
+ globalThis.fetch=async()=>{calls++;throw Error("network should not run")};
+ try{
+  const one=await worker.fetch(new Request(BASE+"/api/claim-profile",{method:"POST",headers:{origin:"https://evil.example",authorization:"Bearer test.jwt.signature"}}));
+  assert.equal(one.status,403);
+  const two=await worker.fetch(new Request(BASE+"/api/claim-profile",{method:"POST",headers:{origin:BASE}}));
+  assert.equal(two.status,401);
+  assert.equal(calls,0);
+ }finally{globalThis.fetch=orig}
+});
+
+test("claim endpoint passes JWT only to fixed Neon RPC and returns boolean",async()=>{
+ const orig=globalThis.fetch;
+ let endpoint,method;
+ globalThis.fetch=async(url,opts)=>{
+  endpoint=String(url);method=opts.method;
+  assert.equal(opts.body,"{}");
+  return new Response("false",{status:200});
+ };
+ try{
+  const r=await worker.fetch(new Request(BASE+"/api/claim-profile",{method:"POST",headers:{origin:BASE,authorization:"Bearer valid.jwt.token"}}));
+  assert.equal(r.status,200);
+  assert.deepEqual(await r.json(),{claimed:false});
+  assert.ok(endpoint.endsWith("/rpc/v3_claim_legacy_profile"));
+  assert.equal(method,"POST");
+ }finally{globalThis.fetch=orig}
+});
