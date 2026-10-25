@@ -24,3 +24,11 @@ jobs:
         run: |
           grep -F 'qixocgetiwlrsbadpbvh.supabase.co' config.js
           test -f backend/neon/functions/staginghealth/index.mjs
+      - name: Verify real staging Neon function HTTP response
+        run: |
+          set -euo pipefail
+          base='https://br-round-fog-b7pseu7j-staginghealth.compute.c-13.us-east-1.aws.neon.tech'
+          curl --fail --silent --show-error --retry 2 --connect-timeout 10 --max-time 45 "$base/health" -o /tmp/looply-v3-health.json
+          node -e 'const fs=require("node:fs");const p=JSON.parse(fs.readFileSync("/tmp/looply-v3-health.json","utf8"));if(p.service!=="looply-v3-backend"||p.environment!=="staging"||p.ready_for_production!==false)process.exit(1)'
+          test "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 25 "$base/profiles")" = 404
+          test "$(curl -sS -X POST -o /dev/null -w '%{http_code}' --max-time 25 "$base/health")" = 405
