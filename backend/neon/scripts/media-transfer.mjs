@@ -43,9 +43,26 @@ export function validateManifest(document, requireUrls = false) {
     seen.add(id);
     total += item.sizeBytes;
     if (requireUrls) {
-      assertSignedUrl(item.sourceUrl, SOURCE_HOST);
-      assertSignedUrl(item.uploadUrl, NEON_HOST);
-      assertSignedUrl(item.verifyUrl, NEON_HOST);
+      const source = assertSignedUrl(item.sourceUrl, SOURCE_HOST);
+      const upload = assertSignedUrl(item.uploadUrl, NEON_HOST);
+      const verify = assertSignedUrl(item.verifyUrl, NEON_HOST);
+      const expectedSourcePath = `/storage/v1/object/sign/${item.bucket}/${item.key}`;
+      const expectedTargetPath = `/${item.bucket}/${item.key}`;
+      for (const [label, actual, expected] of [
+        ["source", source, expectedSourcePath],
+        ["upload", upload, expectedTargetPath],
+        ["verification", verify, expectedTargetPath]
+      ]) {
+        let decoded;
+        try { decoded = decodeURIComponent(actual.pathname); }
+        catch { throw new Error(`Invalid ${label} path encoding`); }
+        if (decoded !== expected) throw new Error(`Signed ${label} URL does not match object key`);
+      }
+      if (!source.searchParams.has("token") ||
+          !upload.searchParams.has("X-Amz-Signature") ||
+          !verify.searchParams.has("X-Amz-Signature")) {
+        throw new Error("Missing signed URL verification parameters");
+      }
     }
   }
   if (total > 5 * 1024 * 1024 * 1024) throw new Error("Manifest exceeds Neon Free storage budget");
