@@ -91,3 +91,15 @@ Foi executada **cópia lógica inicial dos dados públicos de aplicação** (inc
 - todas as quatro tabelas privadas de migração têm RLS habilitado; permissões conferidas: `anonymous` e `authenticated` não possuem USAGE no schema nem SELECT nas tabelas (consultado diretamente no PostgreSQL).
 
 **ATENÇÃO:** esta é cópia JSONB isolada para restauração posterior, não restauração em tabelas operacionais. Não é transação consistente com a aplicação em escrita contínua; requer novo delta/corte e backup independente antes de produção. O arquivo privado ainda depende do Supabase para o conteúdo binário; Neon Auth ainda não tem as seis contas migradas.
+
+## Atualização — restauração tipada privada concluída (homologação)
+
+A estrutura física de **56 tabelas de aplicação** foi reconstituída no schema privado `looply_candidate` do Neon com **351 colunas** e tipos PostgreSQL preservados (`uuid`, `text`, `timestamptz`, `jsonb`, `date`, números e booleanos). O processo fez:
+
+1. Leitura das definições de coluna na origem (somente leitura);
+2. Criação isolada de 56 tabelas em `looply_candidate` com RLS ligado, sem políticas de leitura e **sem GRANT** a `authenticated`/`anonymous`;
+3. Recuperação dos dados por `jsonb_populate_record` a partir do snapshot `looply_migration.source_rows`;
+4. Checagem tipada independente: **867 registros reconstituídos, 56/56 contagens e hashes JSONB iguais** ao inventário verificado da origem;
+5. Checagem SQL de permissões: **56/56 tabelas RLS ON, zero tabelas legíveis aos papéis públicos**.
+
+**Limite da fidelidade de esquema:** colunas e tipos foram preservados; índices, constraints FK/UNIQUE/CHECK, defaults, triggers, policies, grants, funções SQL, views e autenticação do Supabase ainda **não** foram reproduzidos no novo backend. Por isso as tabelas estão **fora do schema `public`** e não são consumidas pelo frontend. Não executar ainda cutover.
