@@ -1,0 +1,38 @@
+name: Looply V3 source baseline verification
+on:
+  push:
+    branches: [migration/import-source-20261025]
+    paths: [.github/workflows/v3-baseline-verify.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: migration/import-source-20261025
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies without invoking remote deployment
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Build and run original unit/contract tests
+        run: npm test
+      - name: Check original source file integrity
+        run: |
+          git clone --filter=blob:none https://github.com/soumoiss/Looply.git /tmp/looply-source
+          git -C /tmp/looply-source checkout --detach d96527dd71a28aa3efb535615fe827dfaacba5d9
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+          src=Path('/tmp/looply-source')
+          names=subprocess.check_output(['git','-C',str(src),'ls-files'],text=True).splitlines()
+          mismatch=[p for p in names if p!='README.md' and (not Path(p).is_file() or Path(p).read_bytes()!=(src/p).read_bytes())]
+          print(f'Checked {len(names)} original files; mismatches excluding README: {len(mismatch)}')
+          if mismatch:
+              print('\n'.join(mismatch[:25]))
+              raise SystemExit(1)
+          PY
