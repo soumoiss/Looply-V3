@@ -25,6 +25,29 @@ export default {
       const text=JSON.stringify(data);
       return new Response(request.method==="HEAD"?null:text,{status:200,headers:responseHeaders});
     }
+    if(path==="/api/feed"){
+      const bearer=request.headers.get("authorization")||"";
+      if(!/^Bearer [A-Za-z0-9._~-]+$/.test(bearer)||bearer.length>4096)
+        return new Response(JSON.stringify({error:"authentication_required"}),{status:401,headers:responseHeaders});
+      try {
+        const endpoint="https://ep-fancy-smoke-b7d6t1s6.apirest.c-13.us-east-1.aws.neon.tech/neondb/rest/v1/v3_feed_posts?select=id,author_id,body,visibility,created_at,updated_at,external_url&order=created_at.desc&limit=25";
+        const upstream=await fetch(endpoint,{method:"GET",headers:{"authorization":bearer,"accept":"application/json"},redirect:"error",signal:AbortSignal.timeout(7000)});
+        if(upstream.status===401||upstream.status===403)
+          return new Response(JSON.stringify({error:"authentication_required"}),{status:401,headers:responseHeaders});
+        if(!upstream.ok) throw new Error("data_api");
+        const body=await upstream.text();
+        if(body.length>250000) throw new Error("response_size");
+        const rows=JSON.parse(body);
+        if(!Array.isArray(rows)||rows.length>25) throw new Error("unexpected_result");
+        const posts=rows.map(post=>({
+          id:post.id,author_id:post.author_id,body:post.body,visibility:post.visibility,
+          created_at:post.created_at,updated_at:post.updated_at,external_url:post.external_url
+        }));
+        return new Response(request.method==="HEAD"?null:JSON.stringify({posts}),{status:200,headers:responseHeaders});
+      }catch{
+        return new Response(JSON.stringify({error:"feed_unavailable"}),{status:503,headers:responseHeaders});
+      }
+    }
     if(path==="/api/self-profile"){
       const bearer=request.headers.get("authorization")||"";
       if(!/^Bearer [A-Za-z0-9._~-]+$/.test(bearer)||bearer.length>4096)
