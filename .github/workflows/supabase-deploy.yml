@@ -1,0 +1,75 @@
+name: Deploy Looply backend to Supabase
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      # Project ref is public and is already the Supabase URL used by Looply.
+      SUPABASE_PROJECT_ID: qixocgetiwlrsbadpbvh
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Validate deployment secrets
+        shell: bash
+        run: |
+          test -n "$SUPABASE_ACCESS_TOKEN" || { echo "Missing SUPABASE_ACCESS_TOKEN"; exit 1; }
+          test -n "$SUPABASE_DB_PASSWORD" || { echo "Missing SUPABASE_DB_PASSWORD"; exit 1; }
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          # Pin the CLI so CI does not depend on the GitHub releases API's
+          # latest-version lookup (which can be rate-limited).
+          version: 2.118.0-beta.37
+
+      - name: Link production project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+
+      - name: Detect migration changes
+        id: migrations
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            if git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- supabase/migrations/ | grep -q .; then
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Apply pending database migrations
+        if: steps.migrations.outputs.changed == 'true'
+        # Fail closed on migration-history mismatches; never rewrite the
+        # production migration ledger automatically in CI.
+        run: supabase db push
+
+      - name: Skip database migrations for function-only changes
+        if: steps.migrations.outputs.changed != 'true'
+        run: echo "No migration files changed; leaving the production database untouched."
+
+      - name: Deploy protected Edge Functions
+        run: |
+          supabase functions deploy looply-admin --project-ref "$SUPABASE_PROJECT_ID"
+          supabase functions deploy looply-youtube-playlist --project-ref "$SUPABASE_PROJECT_ID"
+          supabase functions deploy looply-login --project-ref "$SUPABASE_PROJECT_ID"
+          supabase functions deploy looply-stories-cleanup --project-ref "$SUPABASE_PROJECT_ID"
