@@ -13,6 +13,27 @@ export default {
   async fetch(request) {
     const url = new URL(request.url);
     const path = url.pathname;
+    if (request.method==="POST"&&path==="/api/claim-profile"){
+      const bearer=request.headers.get("authorization")||"";
+      const sameOrigin=request.headers.get("origin")===url.origin;
+      if(!sameOrigin) return new Response(JSON.stringify({error:"origin_not_allowed"}),{status:403,headers:responseHeaders});
+      if(!/^Bearer [A-Za-z0-9._~-]+$/.test(bearer)||bearer.length>4096)
+        return new Response(JSON.stringify({error:"authentication_required"}),{status:401,headers:responseHeaders});
+      try {
+        const endpoint="https://ep-fancy-smoke-b7d6t1s6.apirest.c-13.us-east-1.aws.neon.tech/neondb/rest/v1/rpc/v3_claim_legacy_profile";
+        const upstream=await fetch(endpoint,{method:"POST",headers:{
+          "authorization":bearer,"accept":"application/json","content-type":"application/json"
+        },body:"{}",redirect:"error",signal:AbortSignal.timeout(7000)});
+        if(upstream.status===401||upstream.status===403)
+          return new Response(JSON.stringify({error:"authentication_required"}),{status:401,headers:responseHeaders});
+        if(!upstream.ok) throw new Error("data_api");
+        const result=(await upstream.text()).trim();
+        if(result!=="true"&&result!=="false") throw new Error("unexpected_result");
+        return new Response(JSON.stringify({claimed:result==="true"}),{status:200,headers:responseHeaders});
+      }catch{
+        return new Response(JSON.stringify({error:"claim_service_unavailable"}),{status:503,headers:responseHeaders});
+      }
+    }
     if (request.method!=="GET"&&request.method!=="HEAD")
       return new Response(JSON.stringify({error:"method_not_allowed"}),{status:405,headers:responseHeaders});
     if(path==="/"){
