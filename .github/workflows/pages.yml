@@ -1,0 +1,71 @@
+name: Deploy Looply V3 to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - migration/import-source-20261025
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: looply-v3-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # The V3 app lives on the isolated migration branch until release gates pass.
+      # This avoids accidentally publishing main's status-only README.
+      - name: Check out audited V3 application
+        uses: actions/checkout@v5
+        with:
+          ref: migration/import-source-20261025
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Install project dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run tests and build public site
+        run: pnpm test
+      - name: Verify project-relative assets and public-only output
+        run: |
+          test -s dist/index.html
+          test -s dist/login.html
+          test -s dist/home.html
+          test -s dist/chat.html
+          test -s dist/assets/vendor/neon-js.js
+          test -f dist/.nojekyll
+          grep -q '../assets/vendor/neon-js.js' dist/src/supabase.js
+          ! grep -Eq 'supabase\\.co|service_role|DATABASE_URL|S3_SECRET' dist/config.js
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v6
+      - name: Upload approved build
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: ./dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish Looply V3
+        id: deployment
+        uses: actions/deploy-pages@v5
