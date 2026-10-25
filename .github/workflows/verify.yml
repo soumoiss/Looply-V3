@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out source
         uses: actions/checkout@v5
@@ -18,10 +18,8 @@ jobs:
         with:
           node-version: 22
           package-manager-cache: false
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
+      - name: Install pinned pnpm
+        run: npm install --global pnpm@10.34.8
       - name: Install project dependencies
         run: pnpm install --frozen-lockfile
       - name: Parse browser modules
