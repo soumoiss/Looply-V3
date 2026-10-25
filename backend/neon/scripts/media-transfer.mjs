@@ -1,7 +1,7 @@
 // Secure, operator-gated Supabase -> Neon media transfer using short-lived URLs.
 // Never commit manifests containing signed URLs, passwords or private file contents.
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { open, readFile } from "node:fs/promises";
 
 const SOURCE_HOST = "qixocgetiwlrsbadpbvh.supabase.co";
 const NEON_HOST = "br-round-fog-b7pseu7j.storage.c-13.us-east-1.aws.neon.tech";
@@ -103,10 +103,13 @@ export async function transferOne(item, transport = fetch) {
 
 export async function run(args = process.argv.slice(2)) {
   const execute = args.includes("--execute");
-  if (args.some(arg => arg !== "--execute" && arg !== "--dry-run" && !arg.startsWith("--manifest=")))
-    throw new Error("Allowed arguments: --dry-run | --execute --manifest=FILE");
+  if (args.some(arg => arg !== "--execute" && arg !== "--dry-run" && !arg.startsWith("--manifest=") && !arg.startsWith("--receipt-file=")))
+    throw new Error("Allowed arguments: --dry-run --manifest=FILE | --execute --manifest=FILE --receipt-file=FILE");
   if (execute && process.env.LOOPLY_V3_ALLOW_MEDIA_UPLOAD !== "YES")
     throw new Error("Execution is locked; set explicit staging upload permission");
+  const receiptArg = args.find(arg => arg.startsWith("--receipt-file="));
+  if (execute && (!receiptArg || receiptArg.length <= "--receipt-file=".length))
+    throw new Error("Secure local receipt file is required for uploads");
   const pathArg = args.find(arg => arg.startsWith("--manifest="));
   if (!pathArg) throw new Error("Signed media manifest path is required");
   const filename = pathArg.slice("--manifest=".length);
@@ -120,12 +123,22 @@ export async function run(args = process.argv.slice(2)) {
   }
   let verified = 0;
   let bytes = 0;
-  for (const item of manifest.items) {
-    const result = await transferOne(item);
-    verified++;
-    bytes += result.bytes;
-    // Print counts only. Object names, emails, URL tokens and file bytes stay private.
-    process.stdout.write(JSON.stringify({ mode: "upload", verified, total: summary.objects }) + "\n");
+  // Exclusive create prevents clobbering; local JSONL never stores signed URLs.
+  const receiptHandle = await open(receiptArg.slice("--receipt-file=".length), "wx", 0o600);
+  try {
+    for (const item of manifest.items) {
+      const result = await transferOne(item);
+      verified++;
+      bytes += result.bytes;
+      await receiptHandle.writeFile(JSON.stringify({
+        bucket_id: item.bucket, object_name: item.key,
+        size_bytes: result.bytes, sha256: result.sha256
+      }) + "\\n");
+      // Never log object keys, private URLs, credentials or file bytes.
+      process.stdout.write(JSON.stringify({ mode: "upload", verified, total: summary.objects }) + "\\n");
+    }
+  } finally {
+    await receiptHandle.close();
   }
   return { verified, bytes };
 }
