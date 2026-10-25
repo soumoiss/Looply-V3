@@ -78,3 +78,16 @@ Supabase provável produção: `qixocgetiwlrsbadpbvh` (o arquivo `config.js` da 
 - Não usar R2 até haver habilitação e limites de cobrança auditados.
 - **Neon Free não é armazenamento ilimitado.** Se a aplicação crescer, o limite de storage e egress pode impedir novas operações; ampliar exige decisão explícita, não upgrade automático.
 - Ambiente de homologação novo e separado: não trocar variáveis de produção, domínio, scripts de deploy nem chaves públicas enquanto testes E2E não passarem.
+
+## Atualização — inventário e cópia privada de dados
+
+Foi executada **cópia lógica inicial dos dados públicos de aplicação** (incluindo dados sensíveis de aplicação, como mensagens privadas, tratados em esquema privado) do Supabase para o Neon, sem alterar a origem. Snapshot lógico `v3-stage-20261025-a`, destino `looply_migration.source_rows`:
+- **56/56** tabelas originais inventariadas, inclusive tabelas sem linhas;
+- **867/867** linhas copiadas como objetos JSONB completos, organizados por tabela e ordinal;
+- verificação independente de soma de registros: **0 divergências**;
+- verificação de MD5 sobre a serialização JSONB canônica ordenada, calculado tanto na origem quanto no destino: **56/56 hashes iguais**. MD5 aqui é uma checagem de consistência, não uma assinatura criptográfica de backup.
+- informações mínimas de **6/6** identidades antigas em `looply_migration.auth_user_inventory`, sem importar hashes de senhas, sessões ou tokens. **0 contas mapeadas ao Neon Auth** neste estágio;
+- catálogo de **277/277** objetos e seus metadados em `looply_migration.storage_object_inventory`, totalizando **369.296.700 bytes referenciados**. **0 objetos binários efetivamente enviados ou verificados no Neon Storage**.
+- todas as quatro tabelas privadas de migração têm RLS habilitado; permissões conferidas: `anonymous` e `authenticated` não possuem USAGE no schema nem SELECT nas tabelas (consultado diretamente no PostgreSQL).
+
+**ATENÇÃO:** esta é cópia JSONB isolada para restauração posterior, não restauração em tabelas operacionais. Não é transação consistente com a aplicação em escrita contínua; requer novo delta/corte e backup independente antes de produção. O arquivo privado ainda depende do Supabase para o conteúdo binário; Neon Auth ainda não tem as seis contas migradas.
