@@ -1,4 +1,4 @@
-import { cp, mkdir, rm } from "node:fs/promises";
+import { cp, mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
@@ -12,6 +12,8 @@ if (!outputRelative || outputRelative.startsWith("..") || path.isAbsolute(output
 
 await rm(outputDirectory, { recursive: true, force: true });
 await mkdir(outputDirectory, { recursive: true });
+// GitHub Pages serves project sites under /owner-repo/; disable Jekyll rewriting.
+await writeFile(path.join(outputDirectory, ".nojekyll"), "");
 
 for (const file of ["index.html", "login.html", "home.html", "musicas.html", "chat.html", "conversa.html", "cartas.html", "notificacoes.html", "usuarios.html", "configuracoes.html", "perfil.html", "admin.html", "galeria.html", "styles.css"]) {
   await cp(path.join(projectRoot, file), path.join(outputDirectory, file));
