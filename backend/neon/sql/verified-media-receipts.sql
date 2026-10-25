@@ -30,45 +30,7 @@ DECLARE
 BEGIN
   IF p_bucket_id IS NULL OR p_bucket_id='' OR p_object_name IS NULL
      OR p_object_name='' OR p_size_bytes IS NULL OR p_size_bytes < 0
-     OR p_sha256 IS NULL OR p_sha256 !~ '^[0-9a-f]{64}
-    RETURN false;
-  END IF;
-  SELECT (source_object->'metadata'->>'size')::bigint
-  INTO v_size
-  FROM looply_migration.storage_object_inventory
-  WHERE bucket_id = p_bucket_id AND object_name = p_object_name;
-  IF v_size IS NULL OR v_size <> p_size_bytes THEN
-    RETURN false;
-  END IF;
-  INSERT INTO looply_migration.verified_media_receipts
-    (bucket_id,object_name,size_bytes,sha256)
-  VALUES (p_bucket_id,p_object_name,p_size_bytes,p_sha256)
-  ON CONFLICT (bucket_id,object_name) DO NOTHING;
-  RETURN EXISTS(
-    SELECT 1 FROM looply_migration.verified_media_receipts
-    WHERE bucket_id=p_bucket_id AND object_name=p_object_name
-      AND size_bytes=p_size_bytes AND sha256=p_sha256
-  );
-END;
-$func$;
-REVOKE ALL ON FUNCTION looply_migration.record_verified_media(text,text,bigint,text)
-  FROM PUBLIC, anonymous, authenticated;
-
-CREATE OR REPLACE VIEW looply_migration.media_integrity_readiness
-WITH (security_invoker=true)
-AS
-SELECT count(*)::integer AS catalogued_objects,
-       count(receipt.sha256)::integer AS verified_sha256_receipts,
-       count(receipt.sha256) FILTER(
-         WHERE receipt.size_bytes=(inventory.source_object->'metadata'->>'size')::bigint
-       )::integer AS verified_size_and_hash_records,
-       coalesce(sum((inventory.source_object->'metadata'->>'size')::bigint),0)::bigint AS inventoried_bytes
-FROM looply_migration.storage_object_inventory AS inventory
-LEFT JOIN looply_migration.verified_media_receipts AS receipt
-  ON receipt.bucket_id=inventory.bucket_id AND receipt.object_name=inventory.object_name;
-REVOKE ALL ON TABLE looply_migration.media_integrity_readiness
-  FROM PUBLIC, anonymous, authenticated;
- THEN
+     OR p_sha256 IS NULL OR p_sha256 !~ '^[0-9a-f]{64}$' THEN
     RETURN false;
   END IF;
   SELECT (source_object->'metadata'->>'size')::bigint
