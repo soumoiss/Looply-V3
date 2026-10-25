@@ -90,3 +90,10 @@ Até confirmação de equivalência funcional e integridade de dados, manter os 
 - Inventário de esquema por consulta SQL de leitura: 56 tabelas base public, 27 auth, 8 storage. Sem exportação de dados.
 - Documento de segurança e pré-requisitos `docs/DATA_MIGRATION_GATES.md` criado na branch, commit `08821100ba3f814acccbf69ce3ef5b552b339d71`.
 - **Migração de backend, autenticação, banco, storage, realtime e publicação V3 ainda não realizadas.**
+
+## Infraestrutura verificada — 2026-10-25
+- Infraestrutura proposta: Neon PostgreSQL + Cloudflare Workers + Cloudflare R2 (pendente de habilitação R2 e testes de compatibilidade).
+- Neon existente `looply-v3-migration` contém 56 tabelas candidatas, 867 linhas no inventário, 6 contas inventariadas e 277 objetos de mídia inventariados. Nenhuma das 56 tabelas tem `data_verified_at` definido, nenhum usuário tem `target_user_id` e nenhum objeto está marcado `target_verified`.
+- Cloudflare R2 respondeu 403/10042 solicitando habilitação via Dashboard. Nenhum bucket R2 criado.
+- Comparação de cotas e riscos documentada em `docs/INFRASTRUCTURE_DECISION_20261025.md` (branch de migração).
+- Produção Supabase e implantação existente não foram alteradas.
