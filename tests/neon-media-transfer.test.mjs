@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { assertSignedUrl, validateManifest, transferOne } from "../backend/neon/scripts/media-transfer.mjs";
 
 const original = "https://qixocgetiwlrsbadpbvh.supabase.co/storage/v1/object/sign/looply-media/preview.jpg?token=test";
-const target = "https://br-round-fog-b7pseu7j.storage.c-13.us-east-1.aws.neon.tech/looply-media/preview.jpg?signature=test";
+const target = "https://br-round-fog-b7pseu7j.storage.c-13.us-east-1.aws.neon.tech/looply-media/preview.jpg?X-Amz-Signature=test";
 const item = {
   bucket: "looply-media", key: "preview.jpg", sizeBytes: 7,
   contentType: "image/jpeg", sourceUrl: original, uploadUrl: target, verifyUrl: target
@@ -14,6 +14,10 @@ test("media manifest permits exact approved staging endpoints only", () => {
   assert.throws(() => assertSignedUrl("http://qixocgetiwlrsbadpbvh.supabase.co/private", "qixocgetiwlrsbadpbvh.supabase.co"));
   assert.throws(() => assertSignedUrl("https://evil.example/private", "qixocgetiwlrsbadpbvh.supabase.co"));
   assert.throws(() => validateManifest({ items: [{ ...item, uploadUrl: "https://attacker.example/file" }] }, true));
+  assert.throws(() => validateManifest({ items: [{ ...item, uploadUrl: target.replace("preview.jpg", "some-other-user.jpg") }] }, true));
+  assert.throws(() => validateManifest({ items: [{ ...item, sourceUrl: original.replace("preview.jpg", "some-other-user.jpg") }] }, true));
+  assert.throws(() => validateManifest({ items: [{ ...item, sourceUrl: original.replace("token=test", "not-a-token=test") }] }, true));
+  assert.throws(() => validateManifest({ items: [{ ...item, verifyUrl: target.replace("X-Amz-Signature=test", "signature=test") }] }, true));
   assert.throws(() => validateManifest({ items: [{ ...item, key: "../secret" }] }, true));
   assert.throws(() => validateManifest({ items: [item, item] }, true));
 });
