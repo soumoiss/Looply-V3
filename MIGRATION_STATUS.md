@@ -82,3 +82,11 @@ Até confirmação de equivalência funcional e integridade de dados, manter os 
 - Isso é uma cópia de arquivos, **não** uma migração do histórico Git completo, do banco de dados, de usuários ou de mídias.
 - A branch de migração ainda não foi incorporada à main nem publicada. O frontend continua dependente de Supabase.
 - O workflow de importação de histórico completo continua não executado. Sem build/E2E ou implantação de backend novo comprovados.
+
+## Histórico original e validação
+- Branch `source-snapshot-20261025` verificada via API GitHub: head `d96527dd71a28aa3efb535615fe827dfaacba5d9`, correspondente ao commit auditado do repositório original.
+- README original preservado em `docs/ORIGINAL_LOOPLY_README.md` na branch de importação, commit `7eb8cf67fb86fcd70dfb3dcc43164ccf2c24396d`.
+- Workflow `v3-baseline-verify.yml` criado, commit `74066ffe0247e4684dd79a7b03f8d03a57e52dd1`; **sem resultado de execução confirmado**.
+- Inventário de esquema por consulta SQL de leitura: 56 tabelas base public, 27 auth, 8 storage. Sem exportação de dados.
+- Documento de segurança e pré-requisitos `docs/DATA_MIGRATION_GATES.md` criado na branch, commit `08821100ba3f814acccbf69ce3ef5b552b339d71`.
+- **Migração de backend, autenticação, banco, storage, realtime e publicação V3 ainda não realizadas.**
