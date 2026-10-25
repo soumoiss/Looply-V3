@@ -1,0 +1,35 @@
+name: Preserve audited original Git history
+on:
+  push:
+    branches: [migration/import-source-20261025]
+    paths: [.github/workflows/preserve-source-history.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  preserve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Clone all original Git history
+        run: |
+          git clone https://github.com/soumoiss/Looply.git /tmp/looply-original
+          cd /tmp/looply-original
+          git cat-file -e d96527dd71a28aa3efb535615fe827dfaacba5d9^{commit}
+          git branch source-snapshot d96527dd71a28aa3efb535615fe827dfaacba5d9
+      - name: Push non-destructive historical snapshot to private V3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd /tmp/looply-original
+          git remote add v3 "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          if git ls-remote --exit-code v3 refs/heads/source-snapshot-20261025; then
+            echo "Snapshot branch already exists, refusing to overwrite it"
+            exit 0
+          fi
+          git push v3 refs/heads/source-snapshot:refs/heads/source-snapshot-20261025
+      - name: Validate snapshot remote reference
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git ls-remote "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" refs/heads/source-snapshot-20261025 | grep '^d96527dd71a28aa3efb535615fe827dfaacba5d9'
