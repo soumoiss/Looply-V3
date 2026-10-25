@@ -53,3 +53,11 @@ Até confirmação de equivalência funcional e integridade de dados, manter os 
 ## Importação de código — andamento
 - Branch `migration/import-source-20261025`: 34 arquivos originais copiados e confirmados por operações Git; commits recentes `b6a196b`, `4c7746d`, `882bb52`.
 - Ainda falta copiar o restante da árvore Git e o histórico; o build e os testes ainda não foram executados.
+
+## Continuação verificada — importação e espelhamento
+- Repositório de destino confirmado privado via API GitHub.
+- Branch `migration/import-source-20261025`: 151 dos 338 arquivos originais presentes na árvore, todos os testes originais copiados; restantes: Android 36, docs 11, Supabase 140.
+- Último commit de importação: `b48a4de1167b47391805ac525bd43f715e5a7048`.
+- Criado workflow de acionamento **manual** `.github/workflows/import-original-history.yml` na main, commit `1d4c4da43bce357d24c0d102523e39cb5fb7c9d5`. Se executado, faz clone completo da origem, valida SHA de main e cria branch isolada `source-snapshot-20261025` com histórico original. Nunca altera a main do V3 nem a branch incremental. Não executado nem testado ainda.
+- Atenção: a cópia integral do histórico também pode conter credenciais históricas. Antes de tornar público ou implantar, realizar auditoria de segredos e rotação de credenciais afetadas.
+- Build, testes funcionais, exportação e restauração de dados ainda não realizados.
