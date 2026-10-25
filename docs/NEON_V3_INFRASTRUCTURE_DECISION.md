@@ -103,3 +103,16 @@ A estrutura física de **56 tabelas de aplicação** foi reconstituída no schem
 5. Checagem SQL de permissões: **56/56 tabelas RLS ON, zero tabelas legíveis aos papéis públicos**.
 
 **Limite da fidelidade de esquema:** colunas e tipos foram preservados; índices, constraints FK/UNIQUE/CHECK, defaults, triggers, policies, grants, funções SQL, views e autenticação do Supabase ainda **não** foram reproduzidos no novo backend. Por isso as tabelas estão **fora do schema `public`** e não são consumidas pelo frontend. Não executar ainda cutover.
+
+## Atualização — DDL relacional isolado (ainda não ativado)
+
+No schema privado `looply_candidate` foram reproduzidos, com consultas apenas de leitura à origem e alterações **somente no Neon novo**:
+
+- **174/174 índices** originais (incluindo 76 índices UNIQUE);
+- **312/312 colunas NOT NULL**;
+- **161/161 DEFAULTs**;
+- **286/291 constraints** do esquema original: 56 PKs, 17 UNIQUE, 119 CHECK e **94/99** FKs;
+- as **5 FKs restantes** apontam a `auth.users` do Supabase e ficam explicitamente pendentes até a migração/compatibilidade de identidades;
+- validação pós-DDL através de função interna `looply_migration.verify_candidate_snapshot()`: **56/56 tabelas idênticas ao snapshot de origem por contagem e digest**.
+
+Importante: funções SQL, triggers, views, RLS policies da aplicação, `SECURITY DEFINER`, esquemas operacionais `auth/storage`, autenticação real, bytes de mídia e tempo real **não foram portados**. As tabelas candidatas seguem inacessíveis pela Data API. A função de validação é `SECURITY INVOKER` e o schema privado não tem GRANT público.
