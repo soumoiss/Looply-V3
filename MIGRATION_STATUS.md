@@ -97,3 +97,15 @@ Até confirmação de equivalência funcional e integridade de dados, manter os 
 - Cloudflare R2 respondeu 403/10042 solicitando habilitação via Dashboard. Nenhum bucket R2 criado.
 - Comparação de cotas e riscos documentada em `docs/INFRASTRUCTURE_DECISION_20261025.md` (branch de migração).
 - Produção Supabase e implantação existente não foram alteradas.
+
+## Atualização — ambiente de homologação Neon Free (2026-10-25)
+
+**Infraestrutura isolada criada e verificada:** projeto Neon `small-scene-81115187` (`looply-v3-migration`, região `aws-us-east-1`, PostgreSQL 17), branch `br-round-fog-b7pseu7j`, autenticação Managed Better Auth ativa, Data API ativa sem permissões públicas padrão, sete buckets de armazenamento **privados**. Neon Realtime desligado por não suportar RLS diretamente durante o beta. Neon organização identificada como plano Free; quota PostgreSQL **efetivamente reportada neste projeto é 512 MiB** (menor que 1 GB divulgado nas páginas do serviço). Cloudflare R2 da conta conectada indisponível/sem habilitação (erro HTTP 403 10042); não foi ativado faturamento.
+
+**Dados de produção preservados em homologação:** 56 tabelas da aplicação, 867 registros copiados como JSONB completo para schema privado `looply_migration`. Mais seis registros mínimos de identidade e metadados de 277 objetos (~369,3 MB) catalogados, sem copiar verificadores de senha nem bytes dos arquivos.
+
+**Restauração relacional privada:** 56 tabelas tipadas (`looply_candidate`) com todos os 867 registros. Recuperados 174 índices, 312 restrições NOT NULL, 161 defaults, **286/291 constraints** (56 PK, 17 UNIQUE, 119 CHECK, 94 FKs internas). **Cinco FKs para `auth.users` pendentes**. Validação executada via `looply_migration.verify_candidate_snapshot()`: **56/56 hashes e contagens correspondentes** à origem. As tabelas de homologação não são expostas à Data API e não têm privilégios públicos de leitura.
+
+**Ainda NÃO concluído:** migração dos 277 arquivos reais; migração/redefinição segura do login das seis contas para Neon Auth; port de funções SQL, políticas RLS, triggers, funções de borda, realtime seguro e demais regras de negócio; restauração funcional em `public`; build/E2E em produção independente; delta de dados, backups offsite, publicação/cutover. O Looply original no Supabase e na Vercel continua intocado. Não foi criado plano pago nem realizada cobrança deliberada.
+
+Documentação detalhada na branch `migration/import-source-20261025`: [NEON_V3_INFRASTRUCTURE_DECISION.md](https://github.com/soumoiss/Looply-V3/blob/migration/import-source-20261025/docs/NEON_V3_INFRASTRUCTURE_DECISION.md).
