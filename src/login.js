@@ -114,7 +114,7 @@ if (!isSupabaseConfigured || !supabase) {
             password: secret
           });
           if (emailAuthError) throw emailAuthError;
-          if (!emailAuthData?.session?.access_token || !emailAuthData.session.refresh_token) {
+          if (!emailAuthData?.session?.access_token) {
             throw new Error("session_not_created");
           }
           window.location.replace(nextPage);
@@ -140,7 +140,7 @@ if (!isSupabaseConfigured || !supabase) {
             password: secret
           });
           if (fallbackAuthError) throw new Error("fallback_auth_failed", { cause: fallbackAuthError });
-          if (!fallbackAuthData?.session?.access_token || !fallbackAuthData.session.refresh_token) {
+          if (!fallbackAuthData?.session?.access_token) {
             throw new Error("session_not_created");
           }
           window.location.replace(nextPage);
@@ -152,7 +152,7 @@ if (!isSupabaseConfigured || !supabase) {
           refresh_token: data.refresh_token
         });
         if (sessionError) throw sessionError;
-        if (!savedSessionData?.session?.access_token || !savedSessionData.session.refresh_token) {
+        if (!savedSessionData?.session?.access_token) {
           throw new Error("session_not_created");
         }
         window.location.replace(nextPage);
