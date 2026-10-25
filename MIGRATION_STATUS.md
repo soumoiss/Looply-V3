@@ -39,3 +39,17 @@ A conexão GitHub desta conversa oferece criação e edição de arquivos, branc
 
 ## Regra de rollback
 Até confirmação de equivalência funcional e integridade de dados, manter os serviços atuais e o repositório original intactos. Nenhuma exclusão é autorizada.
+
+## Auditoria de dados — 2026-10-25 (somente leitura)
+- Projeto Supabase com inventário mais completo: Looply V2 (`qixocgetiwlrsbadpbvh`); confirmar associação à produção antes de migrar.
+- Outro projeto ativo `kgrxvsizfmaxlosiitec`: três tabelas públicas identificadas.
+- Looply V2: 6 usuários auth, 6 perfis, 25 posts, 31 mensagens de chat, 97 cartas arquivadas, 228 registros de archive_media, 189 notificações, 2 stories.
+- Storage: 7 buckets cadastrados, seis privados; 277 objetos contabilizados nas seis coleções com objetos.
+- Objetos por bucket: avatars 24; chat 9; gallery 5; letters 2; media 236; secret-messages 1; announcements 0.
+- Soma dos tamanhos declarados em metadados: 369296700 bytes (~369,3 MB decimal); não é verificação dos bytes físicos nem checksum.
+- Nenhum conteúdo de usuários, credencial ou mídia foi exportado ou incluído no GitHub.
+- **Importante:** listagem de tabelas e contagem de objetos NÃO constitui backup, validação de restauração ou migração de dados.
+
+## Importação de código — andamento
+- Branch `migration/import-source-20261025`: 34 arquivos originais copiados e confirmados por operações Git; commits recentes `b6a196b`, `4c7746d`, `882bb52`.
+- Ainda falta copiar o restante da árvore Git e o histórico; o build e os testes ainda não foram executados.
