@@ -75,3 +75,10 @@ Até confirmação de equivalência funcional e integridade de dados, manter os 
 - Migrações iniciais de perfis, posts, conversas, arquivo histórico, mídias e notificações preservadas em commits `1feae9e9c9c089efdc4ad166eaf55b8c5e091c77` e `04ea788d457a94df107db55ff854a0a6436c2a8e`.
 - Corrigido workflow manual de histórico para usar o commit auditado exato, commit `87239f86974cf3f45e3827a54e91dcd26034678a`.
 - Sem implantação, testes E2E ou migração de dados nesta etapa.
+
+## Importação da árvore original concluída — 2026-10-25
+- A automação `.github/workflows/complete-source-import.yml` gerou o commit `f00c3e838f7f65e77d645685085278369a63eb9b` na branch `migration/import-source-20261025`.
+- Auditoria via API GitHub: **338 de 338 caminhos originais presentes**; os hashes Git de todos coincidem exceto `README.md` (conteúdo específico V3).
+- Isso é uma cópia de arquivos, **não** uma migração do histórico Git completo, do banco de dados, de usuários ou de mídias.
+- A branch de migração ainda não foi incorporada à main nem publicada. O frontend continua dependente de Supabase.
+- O workflow de importação de histórico completo continua não executado. Sem build/E2E ou implantação de backend novo comprovados.
