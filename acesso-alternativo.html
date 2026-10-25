@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="lilas">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F5F0FA">
+<meta name="referrer" content="no-referrer">
+<title>Acesso alternativo — Looply V3</title>
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+body{margin:0;min-height:100svh;display:grid;place-items:center;padding:22px;background:radial-gradient(circle at 15% 15%,#eddef8,#f5f0fa 65%);color:#29252f;font-family:system-ui,-apple-system,sans-serif}
+*,*::before,*::after{box-sizing:border-box}
+main{width:min(100%,460px);padding:clamp(22px,6vw,40px);background:#fff;border:1px solid #e8ddef;border-radius:28px;box-shadow:0 20px 60px #7010b016}
+h1{font-family:Georgia,serif;color:#7010b0;font-size:2rem;margin:8px 0 12px}
+p{line-height:1.55;color:#575060}label{display:block;margin:18px 0 7px;font-weight:650}
+input{width:100%;font:inherit;padding:14px;border:1px solid #d9c9e5;border-radius:13px;background:#faf7fc;color:#29252f}
+button{font:inherit;border:0;cursor:pointer}.primary{display:block;width:100%;background:#7010b0;color:white;font-weight:750;border-radius:22px;padding:15px;margin:20px 0 10px}
+.primary:disabled{opacity:.6;cursor:wait}button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid #20b99a;outline-offset:2px}
+a{color:#7010b0;font-weight:600;text-underline-offset:3px}
+.links{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-top:20px}
+#message{min-height:22px;margin:12px 0;color:#5e397c}
+#message[data-kind=error]{color:#a21a32}
+[hidden]{display:none!important}
+.kicker{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#6e5186;font-weight:700}
+.profile{padding:18px;border-radius:16px;background:#f7f0fb;border:1px solid #e6d9f0}
+.profile h2{margin:6px 0 2px;font-size:23px}
+.profile small{color:#6d517c}
+.profile p{white-space:pre-wrap;overflow-wrap:anywhere}
+.secondary{background:transparent;color:#7010b0;text-decoration:underline;padding:8px 0}
+</style>
+</head>
+<body>
+<main>
+<span class="kicker">MoissWorld • Looply</span>
+<h1>Acesso alternativo</h1>
+<p>Use o mesmo nome de usuário ou e-mail e a senha da conta original. A validação acontece no serviço de autenticação original, e somente o seu perfil é carregado após a confirmação.</p>
+<form id="alternateLogin">
+<label for="identity">Usuário ou e-mail</label>
+<input id="identity" name="identity" type="text" placeholder="Seu usuário ou e-mail antigo" required autocomplete="username" maxlength="254" spellcheck="false" autocapitalize="none" list="legacyUsernames">
+<datalist id="legacyUsernames"></datalist>
+<label for="secret">Senha original</label>
+<input id="secret" name="secret" type="password" required autocomplete="current-password" maxlength="256">
+<button id="submit" class="primary" type="submit">Entrar na conta antiga</button>
+</form>
+<p id="message" role="status" aria-live="polite"></p>
+<section id="account" hidden aria-label="Seu perfil autenticado">
+ <div class="profile"><small>Identidade validada</small><h2 id="profileName"></h2><strong id="profileUsername"></strong><p id="profileBio"></p></div>
+ <p>O perfil foi carregado a partir da conta original. A sessão deste acesso é independente da sessão Neon V3.</p>
+ <a class="primary" style="text-align:center;text-decoration:none" href="https://soumoiss.github.io/Looply/home.html">Abrir a versão original</a>
+ <button id="signOut" class="secondary" type="button">Sair desta conta</button>
+</section>
+<div class="links"><a href="login.html">Login Neon V3</a><a href="recuperar.html">Recuperar senha V3</a></div>
+</main>
+<script type="module" src="src/alternate-access.js"></script>
+</body>
+</html>
