@@ -145,3 +145,10 @@ Documentação detalhada na branch `migration/import-source-20261025`: [NEON_V3_
 **Custos e preservação:** Neon organização Free, projeto de homologação reporta limite PostgreSQL 512 MiB, objeto 5 GB Free publicado, funções limitadas; Cloudflare R2 segue bloqueado `403/10042`, sem habilitar cobrança. Snapshot manual interno `snap-curly-shape-b7es25v7` existente, não constitui backup completo de usuários/mídias. Nenhum deploy/endpoint de produção alterado, nenhum projeto apagado, nenhum plano pago contratado.
 
 **Próximos bloqueios:** acesso delegado seguro aos bytes do Storage Supabase e presigned URLs Neon para transferência verificada; fluxo de reautenticação/redefinição de senha das seis contas; adaptação segura de 111 policies de identidade e 38 funções privilegiadas; APIs, realtime, mídia privada, E2E por usuário, backup offsite, delta e corte planejado. Código/planos na branch de migração; não consolidar em `main` ou colocar no ar antes da aprovação dos testes.
+
+### Verificação adicional de integridade contra a produção (2026-10-25)
+
+Consulta read-only direta no Supabase origin calculou, **em um único statement**, contagens e hash MD5 do JSONB canônico de cada uma das 56 tabelas `public`; comparação com o inventário persistido no Neon confirmou **56/56 hashes e contagens coincidentes, 867 registros, zero divergências detectadas no instante da consulta**. SQL reproduzível salvo na branch de migração: `backend/neon/sql/audit-supabase-origin-readonly.sql` (commit `503fc8de02d5adc32e089dc0689d73e7e5594c08`). Isto **não substitui um snapshot transacional/backup offsite** e não garante ausência de alterações depois da consulta.
+
+A ferramenta de transferência de mídias agora exige arquivo de recibos local exclusivo `--receipt-file`, permissões `0600` e produz uma linha JSONL por objeto SHA-256 verificado, sem tokens/URLs; ref `backend/neon/scripts/media-transfer.mjs`. Foram acrescentados testes `tests/neon-media-run.test.mjs`. **Testes unitários via execução real do Node e transferência real de arquivos não confirmados.**
+
