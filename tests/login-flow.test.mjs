@@ -12,7 +12,7 @@ const run = Object.getPrototypeOf(async function () {}).constructor(
 const session = { access_token: 'test-access', refresh_token: 'test-refresh' };
 const serviceError = (status) => ({ status, name: 'AuthApiError' });
 
-async function login({ edge, rpc, auth, saved } = {}) {
+async function login({ edge, rpc, auth, saved, identity = 'FIXTURE_USER', neon = false } = {}) {
   const elements = new Map();
   for (const id of ['loginForm', 'message', 'loginButton', 'password', 'togglePassword']) {
     elements.set(id, {
@@ -30,9 +30,9 @@ async function login({ edge, rpc, auth, saved } = {}) {
       async setSession() { calls.saved++; return saved ?? { data: { session } }; }
     }
   };
-  const window = { location: { search: '', replace: (url) => calls.redirects.push(url) } };
+  const window = { LOOPLY_CONFIG: neon ? { backendProvider: 'neon' } : {}, location: { search: '', replace: (url) => calls.redirects.push(url) } };
   await run({ getElementById: (id) => elements.get(id) }, window, client, true, () => {},
-    class { get(key) { return key === 'username' ? '  FIXTURE_USER  ' : 'fixture-secret'; } },
+    class { get(key) { return key === 'username' ? `  ${identity}  ` : 'fixture-secret'; } },
     { warn() {}, error() {} });
   await elements.get('loginForm').submit({ preventDefault() {} });
   return { calls, message: elements.get('message').textContent, button: elements.get('loginButton') };
@@ -91,3 +91,26 @@ for (const [name, replies] of Object.entries({
     assert.match(message, /indisponível/);
   });
 }
+
+
+test('Neon email login succeeds with access JWT and no Supabase refresh token', async () => {
+  const { calls } = await login({
+    identity: 'PERSON@EXAMPLE.INVALID',
+    neon: true,
+    auth: { data: { session: { access_token: 'neon-test-access-only' } } }
+  });
+  assert.deepEqual(calls.redirects, ['home.html']);
+  assert.equal(calls.auth, 1);
+  assert.equal(calls.edge, 0);
+  assert.equal(calls.rpc, 0);
+  assert.equal(calls.saved, 0);
+});
+
+test('Neon username login fails clearly before invoking missing Supabase gateway', async () => {
+  const { calls, message } = await login({ identity: 'legacy_user', neon: true });
+  assert.deepEqual(calls.redirects, []);
+  assert.equal(calls.auth, 0);
+  assert.equal(calls.edge, 0);
+  assert.equal(calls.rpc, 0);
+  assert.match(message, /nome de usuário ainda não foi migrado/);
+});
