@@ -1,0 +1,448 @@
+import { icon } from "./icons.js";
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[character]);
+}
+
+function person(profile) {
+  return profile ? `@${escapeHtml(profile.username)}` : "perfil restrito";
+}
+
+function isDirectAudioUrl(value) {
+  try {
+    const url = new URL(String(value || ""));
+    return url.protocol === "https:" && /\.(?:mp3|m4a|aac|ogg|oga|wav|flac|webm)(?:$|[?#])/i.test(url.pathname + url.search);
+  } catch {
+    return false;
+  }
+}
+
+export function musicEmbedForUrl(value) {
+  try {
+    const url = new URL(String(value || ""));
+    if (url.protocol !== "https:") return null;
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    if (["youtube.com", "music.youtube.com", "youtu.be"].includes(host)) {
+      let id = host === "youtu.be" ? url.pathname.split("/").filter(Boolean)[0] : url.searchParams.get("v");
+      if (!id && host !== "youtu.be") {
+        const parts = url.pathname.split("/").filter(Boolean);
+        if (["embed", "shorts", "live"].includes(parts[0])) id = parts[1];
+      }
+      if (!/^[A-Za-z0-9_-]{11}$/.test(id || "")) return null;
+      return { provider: "youtube", height: 240, src: `https://www.youtube-nocookie.com/embed/${id}?playsinline=1&rel=0` };
+    }
+    if (host === "open.spotify.com") {
+      const parts = url.pathname.split("/").filter(Boolean);
+      const index = parts.findIndex((part) => ["track", "album", "playlist", "episode", "show"].includes(part));
+      const kind = parts[index];
+      const id = parts[index + 1];
+      if (index < 0 || !/^[A-Za-z0-9]+$/.test(id || "")) return null;
+      return { provider: "spotify", height: kind === "track" ? 152 : 352, src: `https://open.spotify.com/embed/${kind}/${id}?utm_source=generator&theme=0` };
+    }
+    if (host === "soundcloud.com" && /^\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/?$/.test(url.pathname)) {
+      const embed = new URL("https://w.soundcloud.com/player/");
+      embed.searchParams.set("url", url.origin + url.pathname);
+      embed.searchParams.set("auto_play", "false");
+      embed.searchParams.set("visual", "true");
+      return { provider: "soundcloud", height: 166, src: embed.toString() };
+    }
+    if (host === "music.apple.com" && /^\/[a-z]{2}\/(?:album|playlist)\//i.test(url.pathname)) {
+      return { provider: "apple-music", height: 450, src: `https://embed.music.apple.com${url.pathname}` };
+    }
+  } catch { /* Unsupported or malformed URLs stay on the explicit-link fallback. */ }
+  return null;
+}
+
+function formatAudioTime(value) {
+  if (!Number.isFinite(value) || value < 0) return "0:00";
+  const totalSeconds = Math.floor(value);
+  const seconds = String(totalSeconds % 60).padStart(2, "0");
+  const minutes = Math.floor(totalSeconds / 60);
+  if (minutes < 60) return `${minutes}:${seconds}`;
+  return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}:${seconds}`;
+}
+
+export function musicPlayerMarkup(item) {
+  const url = escapeHtml(item.listen_url);
+  if (!isDirectAudioUrl(item.listen_url)) {
+    const embed = musicEmbedForUrl(item.listen_url);
+    if (embed) {
+      return `<div class="music-player music-player-embed" data-provider="${embed.provider}"><iframe src="${escapeHtml(embed.src)}" title="Tocar ${escapeHtml(item.title || "música")}" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" allowfullscreen height="${embed.height}"></iframe></div>`;
+    }
+    return `<div class="music-player music-player-external">
+      <span class="music-player-source">Fonte externa</span>
+      <a class="music-listen" href="${url}" target="_blank" rel="noopener noreferrer">Abrir música ${icon("external")}</a>
+      <span class="music-player-hint">Este serviço não oferece um player integrado compatível.</span>
+    </div>`;
+  }
+  return `<div class="music-player" data-music-player>
+    <audio data-music-audio preload="metadata" src="${url}"></audio>
+    <button class="music-player-button" type="button" data-music-play aria-label="Tocar música">${icon("play")}<span>Tocar</span></button>
+    <div class="music-player-main">
+      <div class="music-player-topline"><span class="music-player-label">Player Looply</span><span data-music-time>0:00 / 0:00</span></div>
+      <input class="music-player-progress" data-music-seek type="range" min="0" max="0" step="0.1" value="0" aria-label="Posição da música">
+      <div class="music-player-bottomline"><span data-music-status role="status" aria-live="polite">Pronto para tocar</span><span class="music-player-wave" aria-hidden="true">${Array.from({ length: 9 }, (_, index) => `<i style="--music-bar-delay:${index * 70}ms"></i>`).join("")}</span></div>
+    </div>
+  </div>`;
+}
+
+export async function loadMusicData(client, userId) {
+  const [peopleResult, dedicationsResult, libraryResult, generalCommentsResult] = await Promise.all([
+    client.from("profiles").select("id,username,display_name").order("username").limit(100),
+    client.from("music_dedications")
+      .select("id,sender_id,recipient_id,title,artist,listen_url,dedication_note,created_at,sender:profiles!music_dedications_sender_id_fkey(username,display_name),recipient:profiles!music_dedications_recipient_id_fkey(username,display_name),comments:music_comments(id,author_id,body,visibility,created_at,author:profiles!music_comments_author_id_fkey(username,display_name))")
+      .order("created_at", { ascending: false }).limit(50),
+    client.from("music_library").select("id,owner_id,title,artist,listen_url,note,created_at,updated_at")
+      .eq("owner_id", userId).order("created_at", { ascending: false }).limit(100),
+    client.from("music_page_comments").select("id,body,created_at,author_id,author:profiles!music_page_comments_author_id_fkey(username,display_name)")
+      .eq("comment_type", "general").order("created_at", { ascending: true }).limit(100)
+  ]);
+  return {
+    people: peopleResult.data || [],
+    peopleError: peopleResult.error,
+    dedications: dedicationsResult.data || [],
+    dedicationsError: dedicationsResult.error,
+    library: libraryResult.data || [],
+    libraryError: libraryResult.error,
+    generalComments: generalCommentsResult.data || [],
+    generalCommentsError: generalCommentsResult.error
+  };
+}
+
+function libraryMarkup(items, error) {
+  if (error) return `<p class="music-error" role="alert">Não foi possível carregar sua coleção pessoal.</p>`;
+  if (!items.length) return `<p class="music-empty">Sua coleção pessoal está vazia.</p>`;
+  return items.map((item) => `<article class="music-card music-library-card" data-library-track="${escapeHtml(item.id)}">
+    <div class="music-card-top"><span class="music-disc" aria-hidden="true">♫</span><span class="music-date">Na sua coleção</span></div>
+    <h3>${escapeHtml(item.title)}</h3>${item.artist ? `<p class="music-artist">${escapeHtml(item.artist)}</p>` : ""}
+    ${item.note ? `<p class="music-note">${escapeHtml(item.note)}</p>` : ""}
+    ${musicPlayerMarkup(item)}
+    <button class="text-button" type="button" data-music-library-delete="${escapeHtml(item.id)}">Remover da minha coleção</button>
+    <span class="form-status" data-library-delete-status role="status" aria-live="polite"></span>
+  </article>`).join("");
+}
+
+function personalLibraryMarkup(data) {
+  return `<details class="music-library-panel"><summary>Minha coleção pessoal</summary>
+    <p class="field-hint">Só você e a administração auditada podem consultar esta lista.</p>
+    <form class="music-library-form" data-music-library>
+      <div class="music-form-grid">
+        <div class="field"><label for="libraryMusicTitle">Música</label><input id="libraryMusicTitle" name="title" type="text" maxlength="160" required placeholder="Nome da música"></div>
+        <div class="field"><label for="libraryMusicArtist">Artista</label><input id="libraryMusicArtist" name="artist" type="text" maxlength="120" placeholder="Nome do artista"></div>
+      </div>
+      <div class="field"><label for="libraryMusicUrl">Link para ouvir</label><input id="libraryMusicUrl" name="listenUrl" type="url" maxlength="1000" required placeholder="YouTube, Spotify, Apple Music ou SoundCloud"></div>
+      <div class="field"><label for="libraryMusicNote">Anotação pessoal (opcional)</label><textarea id="libraryMusicNote" name="note" maxlength="1000" rows="2" placeholder="Por que esta música é importante para você?"></textarea></div>
+      <button class="text-button" type="submit">Salvar na minha coleção</button>
+      <span class="form-status" data-status role="status" aria-live="polite"></span>
+    </form>
+    <div class="music-list" data-music-library-list>${libraryMarkup(data.library, data.libraryError)}</div>
+  </details>`;
+}
+
+function dedicationMarkup(item, userId) {
+  const comments = [...(item.comments || [])].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  const senderIsCurrent = item.sender_id === userId;
+  const direction = senderIsCurrent
+    ? `Você dedicou esta música para ${person(item.recipient)}.`
+    : `${person(item.sender)} dedicou esta música para você.`;
+  const notes = item.dedication_note
+    ? `<p class="music-note">${escapeHtml(item.dedication_note)}</p>`
+    : "";
+  const commentsMarkup = comments.length
+    ? comments.map((comment) => `<article class="music-comment">
+        <div><strong>${person(comment.author)}</strong><span class="music-comment-visibility">${comment.visibility === "private" ? "Só você" : "Compartilhado"}</span></div>
+        <p>${escapeHtml(comment.body)}</p>
+      </article>`).join("")
+    : `<p class="music-empty">Ainda não há comentários nesta dedicatória.</p>`;
+
+  return `<article class="music-card" id="dedication-${escapeHtml(item.id)}" data-dedication="${escapeHtml(item.id)}">
+    <div class="music-card-top"><span class="music-disc" aria-hidden="true">♫</span><span class="music-date">${escapeHtml(new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium" }).format(new Date(item.created_at)))}</span></div>
+    <p class="music-direction">${direction}</p>
+    <h3>${escapeHtml(item.title)}</h3>
+    ${item.artist ? `<p class="music-artist">${escapeHtml(item.artist)}</p>` : ""}
+    ${notes}
+    ${musicPlayerMarkup(item)}
+    <section class="music-comments" aria-label="Comentários privados da música">
+      <h4>Comentários <span>${comments.length}</span></h4>
+      <div class="music-comment-list">${commentsMarkup}</div>
+      <form class="music-comment-form" data-music-comment data-dedication-id="${escapeHtml(item.id)}">
+        <label class="visually-hidden" for="music-comment-${escapeHtml(item.id)}">Seu comentário sobre esta música</label>
+        <textarea id="music-comment-${escapeHtml(item.id)}" name="body" maxlength="2000" required placeholder="Escreva um comentário"></textarea>
+        <div class="music-comment-actions"><label for="comment-visibility-${escapeHtml(item.id)}">Visibilidade</label>
+          <select id="comment-visibility-${escapeHtml(item.id)}" name="visibility"><option value="private">Só eu</option><option value="participants">Compartilhar com quem participa da dedicatória</option></select>
+          <button class="text-button" type="submit">Salvar comentário</button>
+        </div>
+        <span class="form-status" data-status role="status" aria-live="polite"></span>
+      </form>
+    </section>
+  </article>`;
+}
+
+function generalCommentsMarkup(data) {
+  if (data.generalCommentsError) return '<p class="music-empty">Os comentários gerais estão temporariamente indisponíveis.</p>';
+  const comments = data.generalComments || [];
+  if (!comments.length) return '<p class="music-empty">Ainda não há comentários gerais.</p>';
+  return comments.map((comment) => '<article class="music-comment"><strong>' +
+    escapeHtml(comment.author?.display_name || comment.author?.username || "Usuário") +
+    '</strong><p>' + escapeHtml(comment.body) + '</p></article>').join("");
+}
+
+function musicContent(data, userId) {
+  if (data.dedicationsError) {
+    return `<div class="social-message social-error" role="alert">Não foi possível carregar suas músicas. Confira a conexão e tente novamente.</div>`;
+  }
+  const incoming = data.dedications.filter((item) => item.recipient_id === userId).length;
+  const outgoing = data.dedications.filter((item) => item.sender_id === userId).length;
+  const list = data.dedications.length
+    ? data.dedications.map((item) => dedicationMarkup(item, userId)).join("")
+    : `<div class="social-message"><strong>Nenhuma dedicatória recebida ou enviada.</strong></div>`;
+  const choices = data.people.filter((profile) => profile.id !== userId).map((profile) =>
+    `<option value="${escapeHtml(profile.id)}">${escapeHtml(profile.display_name)} · @${escapeHtml(profile.username)}</option>`
+  ).join("");
+  const recipientHint = data.peopleError
+    ? `<span class="field-hint field-error">A lista de perfis não carregou; atualize a página para dedicar uma música.</span>`
+    : choices ? `<span class="field-hint">A dedicatória fica visível apenas para você e o perfil escolhido.</span>`
+      : `<span class="field-hint">Ainda não há outros perfis visíveis para receber uma dedicatória.</span>`;
+
+  return `<section class="music-area" data-music-area aria-labelledby="musicTitle">
+    <div class="music-heading"><div><span class="section-kicker">Biblioteca</span><h2 id="musicTitle">Músicas e dedicatórias</h2></div>
+      <span class="music-count">${incoming} recebida${incoming === 1 ? "" : "s"} · ${outgoing} enviada${outgoing === 1 ? "" : "s"}</span></div>
+    ${personalLibraryMarkup(data)}
+    <section class="music-general-comments" aria-labelledby="musicGeneralCommentsTitle">
+      <h3 id="musicGeneralCommentsTitle">Comentários gerais</h3>
+      <div class="music-general-comment-list" data-music-general-comment-list>${generalCommentsMarkup(data)}</div>
+      <form data-music-general-comment class="music-comment-form"><label for="musicGeneralCommentBody">Comentar na página de músicas</label><textarea id="musicGeneralCommentBody" name="body" maxlength="2000" required placeholder="Escreva um comentário geral"></textarea><button class="text-button" type="submit">Enviar comentário geral</button><span class="form-status" data-status role="status" aria-live="polite"></span></form>
+    </section>
+    <details class="music-composer"><summary>Dedicar uma música</summary>
+      <form data-music-send>
+        <div class="field"><label for="musicRecipient">Para quem é esta música?</label><select id="musicRecipient" name="recipientId" multiple size="5" required ${choices ? "" : "disabled"}><option value="all-users">Todos os usuários</option>${choices}</select>${recipientHint}</div>
+        <div class="music-form-grid">
+          <div class="field"><label for="musicTitle">Música</label><input id="musicTitle" name="title" type="text" maxlength="160" required placeholder="Nome da música"></div>
+          <div class="field"><label for="musicArtist">Artista</label><input id="musicArtist" name="artist" type="text" maxlength="120" placeholder="Nome do artista"></div>
+        </div>
+        <div class="field"><label for="musicUrl">Link para ouvir</label><input id="musicUrl" name="listenUrl" type="url" maxlength="1000" required placeholder="YouTube, Spotify, Apple Music ou SoundCloud"></div>
+        <div class="field"><label for="musicNote">Uma dedicatória (opcional)</label><textarea id="musicNote" name="note" maxlength="1000" rows="3" placeholder="Por que esta música lembrou essa pessoa?"></textarea></div>
+        <button class="primary-button compact-button" type="submit">Enviar dedicatória ${icon("send")}</button>
+        <span class="form-status" data-status role="status" aria-live="polite"></span>
+      </form>
+    </details>
+    <div class="music-list" data-music-list>${list}</div>
+    <span class="realtime-state" data-music-realtime role="status">Conectando atualizações...</span>
+  </section>`;
+}
+
+export function musicMarkup(data, userId) {
+  return musicContent(data, userId);
+}
+
+async function refreshMusic(root, client, userId) {
+  const area = root.querySelector("[data-music-area]");
+  if (!area) return;
+  area.setAttribute("aria-busy", "true");
+  try {
+    area.outerHTML = musicMarkup(await loadMusicData(client, userId), userId);
+    bindMusicPlayers(root);
+  } catch (error) {
+    console.error("Looply music refresh failed", error);
+    area.innerHTML = `<div class="social-message social-error" role="alert">Não foi possível atualizar agora.</div>`;
+  }
+}
+
+function updateMusicPlayer(player, audio) {
+  const duration = Number.isFinite(audio.duration) ? audio.duration : 0;
+  const current = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+  const seek = player.querySelector("[data-music-seek]");
+  const time = player.querySelector("[data-music-time]");
+  const status = player.querySelector("[data-music-status]");
+  if (seek) {
+    seek.max = String(duration);
+    seek.value = String(Math.min(current, duration || current));
+    seek.style.setProperty("--music-progress", `${duration ? (current / duration) * 100 : 0}%`);
+  }
+  if (time) time.textContent = `${formatAudioTime(current)} / ${formatAudioTime(duration)}`;
+  if (status && !audio.error && !audio.paused) status.textContent = "Reproduzindo agora";
+}
+
+function setMusicPlayerPlaying(player, playing) {
+  const button = player.querySelector("[data-music-play]");
+  if (!button) return;
+  button.innerHTML = `${icon(playing ? "pause" : "play")}<span>${playing ? "Pausar" : "Tocar"}</span>`;
+  button.setAttribute("aria-label", playing ? "Pausar música" : "Tocar música");
+  player.classList.toggle("is-playing", playing);
+}
+
+function bindMusicPlayers(root) {
+  root.querySelectorAll("[data-music-player]").forEach((player) => {
+    const audio = player.querySelector("[data-music-audio]");
+    const seek = player.querySelector("[data-music-seek]");
+    if (!audio || player.dataset.musicBound === "true") return;
+    player.dataset.musicBound = "true";
+    ["loadedmetadata", "durationchange", "timeupdate"].forEach((eventName) => audio.addEventListener(eventName, () => updateMusicPlayer(player, audio)));
+    audio.addEventListener("play", () => setMusicPlayerPlaying(player, true));
+    audio.addEventListener("pause", () => setMusicPlayerPlaying(player, false));
+    audio.addEventListener("ended", () => {
+      setMusicPlayerPlaying(player, false);
+      const status = player.querySelector("[data-music-status]");
+      if (status) status.textContent = "Música concluída — toque novamente para repetir";
+    });
+    audio.addEventListener("error", () => {
+      setMusicPlayerPlaying(player, false);
+      const status = player.querySelector("[data-music-status]");
+      if (status) status.textContent = "Não foi possível reproduzir este arquivo";
+    });
+    if (seek) seek.addEventListener("input", () => {
+      audio.currentTime = Number(seek.value) || 0;
+      updateMusicPlayer(player, audio);
+    });
+    updateMusicPlayer(player, audio);
+  });
+}
+
+function setStatus(form, message, kind = "success") {
+  const status = form.querySelector("[data-status]");
+  if (!status) return;
+  status.textContent = message;
+  status.dataset.kind = kind;
+}
+
+export function bindMusicEvents(root, client, getUserId) {
+  bindMusicPlayers(root);
+  root.addEventListener("click", async (event) => {
+    const playButton = event.target.closest("[data-music-play]");
+    if (!playButton) return;
+    const player = playButton.closest("[data-music-player]");
+    const audio = player?.querySelector("[data-music-audio]");
+    if (!player || !audio) return;
+    root.querySelectorAll("[data-music-audio]").forEach((otherAudio) => {
+      if (otherAudio !== audio) otherAudio.pause();
+    });
+    if (audio.paused) {
+      try {
+        await audio.play();
+      } catch {
+        const status = player.querySelector("[data-music-status]");
+        if (status) status.textContent = "Toque novamente para iniciar a reprodução";
+      }
+    } else {
+      audio.pause();
+    }
+  });
+
+  root.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-music-library-delete]");
+    if (!button || !client) return;
+    button.disabled = true;
+    try {
+      const { error } = await client.from("music_library").delete().eq("id", button.dataset.musicLibraryDelete);
+      if (error) throw error;
+      await refreshMusic(root, client, getUserId?.());
+    } catch (error) {
+      console.error("Looply music library delete failed", error);
+      const status = button.closest("[data-library-track]")?.querySelector("[data-library-delete-status]");
+      if (status) {
+        status.textContent = "Não foi possível remover a música. Tente novamente.";
+        status.dataset.kind = "error";
+      }
+      button.disabled = false;
+    }
+  });
+
+  root.addEventListener("submit", async (event) => {
+    const form = event.target.closest("form[data-music-library], form[data-music-send], form[data-music-comment], form[data-music-general-comment]");
+    if (!form || !client) return;
+    event.preventDefault();
+    const button = form.querySelector('button[type="submit"]');
+    const userId = getUserId?.();
+    if (button) button.disabled = true;
+    try {
+      const values = new FormData(form);
+      const body = String(values.get("body") || "").trim();
+      if (form.matches("[data-music-library]")) {
+        const title = String(values.get("title") || "").trim();
+        const artist = String(values.get("artist") || "").trim();
+        const note = String(values.get("note") || "").trim();
+        const listenUrl = String(values.get("listenUrl") || "").trim();
+        const supported = isDirectAudioUrl(listenUrl) || /^https:\/\/(open\.spotify\.com|music\.youtube\.com|youtu\.be|www\.youtube\.com|youtube\.com|music\.apple\.com|soundcloud\.com)\//i.test(listenUrl);
+        if (!title || title.length > 160 || !supported) throw new Error("music-library-fields");
+        const { error } = await client.from("music_library").insert({ title, artist, listen_url: listenUrl, note });
+        if (error) throw error;
+        form.reset();
+        setStatus(form, "A música foi salva na sua coleção.");
+        await refreshMusic(root, client, userId);
+      } else if (form.matches("[data-music-send]")) {
+        const title = String(values.get("title") || "").trim();
+        const artist = String(values.get("artist") || "").trim();
+        const note = String(values.get("note") || "").trim();
+        const recipientIds = values.getAll("recipientId").map(String);
+        const listenUrl = String(values.get("listenUrl") || "").trim();
+        const supported = isDirectAudioUrl(listenUrl) || /^https:\/\/(open\.spotify\.com|music\.youtube\.com|youtu\.be|www\.youtube\.com|youtube\.com|music\.apple\.com|soundcloud\.com)\//i.test(listenUrl);
+        const selectedRecipients = recipientIds.includes("all-users")
+          ? (await client.from("profiles").select("id").neq("id", userId).in("profile_visibility", ["members", "public"])).data?.map((profile) => profile.id) || []
+          : recipientIds.filter((id) => id !== userId);
+        if (!title || title.length > 160 || !selectedRecipients.length || !supported) throw new Error("music-fields");
+        const rows = selectedRecipients.map((recipient_id) => ({ recipient_id, title, artist, dedication_note: note, listen_url: listenUrl }));
+        const { error } = await client.from("music_dedications").insert(rows);
+        if (error) throw error;
+        form.reset();
+        setStatus(form, "Dedicatória enviada para " + selectedRecipients.length + " pessoa(s).");
+        await refreshMusic(root, client, userId);
+      } else if (form.matches("[data-music-general-comment]")) {
+        if (!body || body.length > 2000) throw new Error("comment-fields");
+        const { error } = await client.from("music_page_comments").insert({ comment_type: "general", body });
+        if (error) throw error;
+        form.reset();
+        setStatus(form, "Comentário geral enviado.");
+        await refreshMusic(root, client, userId);
+      } else {
+        const dedicationId = form.dataset.dedicationId;
+        const visibility = String(values.get("visibility") || "private");
+        if (!body || body.length > 2000) throw new Error("comment-fields");
+        const { error } = await client.from("music_comments").insert({ dedication_id: dedicationId, body, visibility });
+        if (error) throw error;
+        await refreshMusic(root, client, userId);
+      }
+    } catch (error) {
+      console.error("Looply music action failed", error);
+      const message = /duplicate|unique/i.test(String(error?.message || ""))
+        ? "Esta dedicatória já foi salva."
+        : "Não foi possível salvar. Confira os campos, o link e as permissões e tente novamente.";
+      setStatus(form, message, "error");
+    } finally {
+      if (button) button.disabled = false;
+    }
+  });
+}
+
+let musicChannel = null;
+let musicUserId = null;
+let musicRefreshTimer = null;
+
+export function setupMusicRealtime(client, userId, root) {
+  if (!client || !userId) return;
+  if (musicChannel && musicUserId === userId) return;
+  if (musicChannel) client.removeChannel(musicChannel);
+  musicUserId = userId;
+  musicChannel = client
+    .channel(`looply-music-${userId}`)
+    .on("postgres_changes", { event: "*", schema: "public", table: "music_dedications" }, () => scheduleMusicRefresh(root, client, userId))
+    .on("postgres_changes", { event: "*", schema: "public", table: "music_comments" }, () => scheduleMusicRefresh(root, client, userId))
+    .on("postgres_changes", { event: "*", schema: "public", table: "music_page_comments" }, () => scheduleMusicRefresh(root, client, userId))
+    .on("postgres_changes", { event: "*", schema: "public", table: "music_library", filter: `owner_id=eq.${userId}` }, () => scheduleMusicRefresh(root, client, userId))
+    .subscribe((state) => {
+      const status = root.querySelector("[data-music-realtime]");
+      if (status) status.textContent = state === "SUBSCRIBED" ? "Atualizações ao vivo" : "Reconectando atualizações...";
+    });
+}
+
+function scheduleMusicRefresh(root, client, userId) {
+  clearTimeout(musicRefreshTimer);
+  musicRefreshTimer = setTimeout(() => refreshMusic(root, client, userId), 350);
+}
+
+export function disposeMusicRealtime(client) {
+  clearTimeout(musicRefreshTimer);
+  if (musicChannel && client) client.removeChannel(musicChannel);
+  musicChannel = null;
+  musicUserId = null;
+}
