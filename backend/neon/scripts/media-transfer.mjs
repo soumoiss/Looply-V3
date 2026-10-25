@@ -133,9 +133,9 @@ export async function run(args = process.argv.slice(2)) {
       await receiptHandle.writeFile(JSON.stringify({
         bucket_id: item.bucket, object_name: item.key,
         size_bytes: result.bytes, sha256: result.sha256
-      }) + "\\n");
+      }) + "\n");
       // Never log object keys, private URLs, credentials or file bytes.
-      process.stdout.write(JSON.stringify({ mode: "upload", verified, total: summary.objects }) + "\\n");
+      process.stdout.write(JSON.stringify({ mode: "upload", verified, total: summary.objects }) + "\n");
     }
   } finally {
     await receiptHandle.close();
